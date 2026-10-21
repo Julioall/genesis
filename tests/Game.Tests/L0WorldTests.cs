@@ -70,6 +70,30 @@ public sealed class L0WorldTests
     }
 
     [Fact]
+    public void Main_ridge_axes_wander_independently_across_the_terrain()
+    {
+        var elevation = TerrainModel.GenerateElevationField(1);
+        var westCrests = new List<int>();
+        var eastCrests = new List<int>();
+        for (var y = 8; y < SimulationState.Height - 8; y += 2)
+        {
+            westCrests.Add(Enumerable.Range(0, SimulationState.Width / 2)
+                .MaxBy(x => elevation[y * SimulationState.Width + x]));
+            eastCrests.Add(Enumerable.Range(SimulationState.Width / 2, SimulationState.Width / 2)
+                .MaxBy(x => elevation[y * SimulationState.Width + x]));
+        }
+
+        Assert.True(westCrests.Distinct().Count() >= 4,
+            $"The western uplift axis should bend across rows, but only occupied {westCrests.Distinct().Count()} columns.");
+        Assert.True(eastCrests.Distinct().Count() >= 4,
+            $"The eastern uplift axis should bend across rows, but only occupied {eastCrests.Distinct().Count()} columns.");
+        Assert.True(westCrests.Max() - westCrests.Min() >= 4,
+            "The western mountain crest should not be a straight line parallel to the river.");
+        Assert.True(eastCrests.Max() - eastCrests.Min() >= 4,
+            "The eastern mountain crest should not be a straight line parallel to the river.");
+    }
+
+    [Fact]
     public void Plateau_has_a_seeded_flat_crown_and_a_real_elevation_break()
     {
         var plateau = TerrainModel.GeneratePlateauGeometry(1);

@@ -112,9 +112,11 @@ public static class TerrainModel
         private readonly ValueNoise _mesoRelief;
         private readonly ValueNoise _microRelief;
         private readonly ValueNoise _ridgeMask;
+        private readonly ValueNoise _rangeAxis;
         private readonly ValueNoise _mountainMask;
         private readonly ValueNoise _rimDetail;
         private readonly MountainRange[] _mountainRanges;
+        private readonly RidgeSpur[] _ridgeSpurs;
         private readonly double _riverPhase;
         private readonly OutcropFeature[] _outcrops;
 
@@ -126,6 +128,7 @@ public static class TerrainModel
             _mesoRelief = new ValueNoise(seed, 2, 0x4D45534F52454C46UL);
             _microRelief = new ValueNoise(seed, 1, 0x4D4943524F524C46UL);
             _ridgeMask = new ValueNoise(seed, 10, 0x52494447454D4153UL);
+            _rangeAxis = new ValueNoise(seed, 12, 0x5249444745415849UL);
             _mountainMask = new ValueNoise(seed, 8, 0x4D4F554E5441494EUL);
             _rimDetail = new ValueNoise(seed, 2, 0x504C415445415552UL);
             _riverPhase = CounterRandom.Unit(seed, CounterRandom.TerrainTag, 40, 1, 0, 0) * Math.PI * 2;
@@ -134,18 +137,21 @@ public static class TerrainModel
             _mountainRanges =
             [
                 new MountainRange(
-                    -(18.5 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 49, 1, 0, 0) * 3),
+                    0,
+                    12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 49, 1, 0, 0) * 4,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 50, 1, 0, 0) * 0.24,
                     4.6 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 51, 1, 0, 0) * 1.0,
                     100 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 14,
                     westPhase),
                 new MountainRange(
-                    18.5 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 53, 1, 0, 0) * 3,
+                    1,
+                    48 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 53, 1, 0, 0) * 4,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 54, 1, 0, 0) * 0.24,
                     4.0 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 55, 1, 0, 0) * 0.9,
                     78 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 10,
                     eastPhase)
             ];
+            _ridgeSpurs = CreateRidgeSpurs(seed);
             var plateauX = 43 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 42, 1, 0, 0) - 0.5) * 8;
             var plateauY = 18 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 43, 1, 0, 0) - 0.5) * 6;
             var plateauRadiusX = 2.9 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 44, 1, 0, 0) * 0.9;
@@ -191,14 +197,11 @@ public static class TerrainModel
             var noiseFactor = 1 - 0.82 * valleyInfluence;
             var height = 62 + (broad * 15 + regional * 8 + detail * 2.8) * noiseFactor;
 
-            // Two seeded, curved mountain chains frame the lowland. Broad flanks, a narrow crest,
-            // segmented massifs, and tapered saddles create connected ridges instead of round noise peaks.
+            // Main uplift axes are seeded independently from the river meander. Broad flanks, a narrow
+            // crest, segmented massifs, and tapered saddles create connected but non-parallel ranges.
             foreach (var range in _mountainRanges)
             {
-                var axis = valleyCenter + range.OffsetFromValleyCells
-                    + range.AxisSlope * (y - 31.5)
-                    + 1.8 * Math.Sin(y * 0.14 + range.Phase)
-                    + 0.8 * Math.Sin(y * 0.33 + range.Phase * 0.71);
+                var axis = MountainAxis(range, y);
                 var across = x - axis;
                 var shoulder = Math.Exp(-Math.Pow(across / range.WidthCells, 2));
                 var crest = Math.Exp(-Math.Pow(across / (range.WidthCells * 0.24), 2));
@@ -208,12 +211,27 @@ public static class TerrainModel
                 var rangeEnds = SmoothStep(-2, 7, y) * (1 - SmoothStep(56, 64, y));
                 height += range.AmplitudeM * (0.76 * shoulder + 0.24 * crest)
                     * brokenMassif * summitRhythm * rangeEnds;
+
+                var ridgeContinuity = 0.34 + 0.66 * SmoothStep(0.14, 0.86,
+                    _ridgeMask.Sample(x * 0.35, y));
+                var innerFold = axis + (range.Index == 0 ? 1 : -1) * 7.0;
+                height += 3.5 * ridgeContinuity * Math.Exp(-Math.Pow((x - innerFold) / 3.8, 2)) * rangeEnds;
             }
 
-            // Smaller fold texture breaks up long uniform slopes while keeping the major forms legible.
-            var ridgeContinuity = 0.34 + 0.66 * SmoothStep(0.14, 0.86, _ridgeMask.Sample(x * 0.35, y));
-            height += 5 * ridgeContinuity * Math.Exp(-Math.Pow((x - valleyCenter - 12) / 4.8, 2));
-            height += 4 * ridgeContinuity * Math.Exp(-Math.Pow((x - valleyCenter + 13) / 5.4, 2));
+            // Lower, narrower tributary ridges extend from the mountain shoulders toward the valley.
+            // D8 drainage is derived only after these physical elevations have been combined.
+            foreach (var spur in _ridgeSpurs)
+            {
+                if (x < spur.MinEast || x > spur.MaxEast || y < spur.MinNorth || y > spur.MaxNorth) continue;
+                var firstDistanceSquared = DistanceSquaredToSegment(x, y, spur.StartEast, spur.StartNorth,
+                    spur.BendEast, spur.BendNorth, out var firstT);
+                var secondDistanceSquared = DistanceSquaredToSegment(x, y, spur.BendEast, spur.BendNorth,
+                    spur.EndEast, spur.EndNorth, out var secondT);
+                var distanceSquared = Math.Min(firstDistanceSquared, secondDistanceSquared);
+                var progress = firstDistanceSquared <= secondDistanceSquared ? firstT * 0.5 : 0.5 + secondT * 0.5;
+                var taper = 1 - 0.48 * SmoothStep(0.68, 1, progress);
+                height += spur.AmplitudeM * Math.Exp(-distanceSquared / spur.WidthSquared) * taper;
+            }
 
             // A wide lowland carries the meander; a shallow narrow incision keeps the river in its valley.
             height -= 22 * valleyInfluence;
@@ -302,12 +320,89 @@ public static class TerrainModel
             => 34 + 8.5 * Math.Sin(y * 0.105 + _riverPhase)
                 + 3.2 * Math.Sin(y * 0.29 + _riverPhase * 0.63);
 
+        private double MountainAxis(MountainRange range, double y)
+        {
+            var axisNoiseX = range.Index == 0 ? 8 : 36;
+            var wandering = (_rangeAxis.Sample(axisNoiseX, y * 0.72) - 0.5) * 7.0;
+            return range.AnchorEastCells + range.AxisSlope * (y - 31.5)
+                + 1.8 * Math.Sin(y * 0.14 + range.Phase)
+                + 0.8 * Math.Sin(y * 0.33 + range.Phase * 0.71)
+                + wandering;
+        }
+
+        private RidgeSpur[] CreateRidgeSpurs(ulong seed)
+        {
+            var spurs = new RidgeSpur[_mountainRanges.Length * 3];
+            var index = 0;
+            foreach (var range in _mountainRanges)
+            for (var branch = 0; branch < 3; branch++)
+            {
+                var id = (ulong)(range.Index * 3 + branch);
+                var random = CounterRandom.Unit(seed, CounterRandom.TerrainTag, 80 + id, 1, 0, 0);
+                var bend = CounterRandom.Unit(seed, CounterRandom.TerrainTag, 90 + id, 1, 0, 0);
+                var direction = branch == 2 ? -1.0 : 1.0;
+                var startNorth = branch switch
+                {
+                    0 => 10 + random * 4,
+                    1 => 29 + random * 4,
+                    _ => 51 - random * 4
+                };
+                var endNorth = Math.Clamp(startNorth + direction * (11 + bend * 5), 3, 60);
+                var valleySide = range.Index == 0 ? -1 : 1;
+                var startEast = MountainAxis(range, startNorth)
+                    + (range.Index == 0 ? 1 : -1) * range.WidthCells * 0.72;
+                var endEast = RiverCenter(endNorth) + valleySide * (5.5 + bend * 2.5);
+                var bendEast = (startEast + endEast) * 0.5
+                    + (range.Index == 0 ? 1 : -1) * (bend - 0.5) * 5.0;
+                var bendNorth = (startNorth + endNorth) * 0.5 + (random - 0.5) * 4.0;
+                var width = 1.65 + random * 0.7;
+                var amplitude = 15 + bend * 8;
+                spurs[index++] = new RidgeSpur(startEast, startNorth, bendEast, bendNorth,
+                    endEast, endNorth, width * width, amplitude,
+                    Math.Min(startEast, Math.Min(bendEast, endEast)) - width * 4,
+                    Math.Max(startEast, Math.Max(bendEast, endEast)) + width * 4,
+                    Math.Min(startNorth, Math.Min(bendNorth, endNorth)) - width * 4,
+                    Math.Max(startNorth, Math.Max(bendNorth, endNorth)) + width * 4);
+            }
+
+            return spurs;
+        }
+
+        private static double DistanceSquaredToSegment(
+            double x, double y, double startX, double startY, double endX, double endY, out double position)
+        {
+            var dx = endX - startX;
+            var dy = endY - startY;
+            var lengthSquared = dx * dx + dy * dy;
+            position = lengthSquared <= 1e-12
+                ? 0
+                : Math.Clamp(((x - startX) * dx + (y - startY) * dy) / lengthSquared, 0, 1);
+            var offsetX = x - (startX + dx * position);
+            var offsetY = y - (startY + dy * position);
+            return offsetX * offsetX + offsetY * offsetY;
+        }
+
         private readonly record struct MountainRange(
-            double OffsetFromValleyCells,
+            int Index,
+            double AnchorEastCells,
             double AxisSlope,
             double WidthCells,
             double AmplitudeM,
             double Phase);
+
+        private readonly record struct RidgeSpur(
+            double StartEast,
+            double StartNorth,
+            double BendEast,
+            double BendNorth,
+            double EndEast,
+            double EndNorth,
+            double WidthSquared,
+            double AmplitudeM,
+            double MinEast,
+            double MaxEast,
+            double MinNorth,
+            double MaxNorth);
 
         private readonly record struct OutcropFeature(
             int Index,

@@ -2,7 +2,7 @@
 
 ## Direção
 
-A câmera permanece ortográfica e fixa, agora a cerca de 24° da vertical para enfatizar a leitura top-down sem esconder as faces. A altitude é dado físico da Geosfera; o cliente MonoGame amostra esse campo e o grava na coordenada vertical da malha. Textura e iluminação reforçam o relevo, mas não o substituem.
+A câmera permanece ortográfica e fixa, agora a cerca de 30° da vertical para enfatizar a leitura top-down sem esconder as faces. A altitude é dado físico da Geosfera; o cliente MonoGame amostra esse campo e o grava na coordenada vertical da malha. Textura e iluminação reforçam o relevo, mas não o substituem.
 
 As referências de Mapgen4 e do artigo Polygonal Map Generation orientam a separação entre feições geográficas, drenagem e biomas. Neste marco usamos curvas e campos de distância diretamente no sampler determinístico; não copiamos código, modelos ou imagens, nem incorporamos bibliotecas externas. Um grafo Voronoi/Delaunay pode ser avaliado quando o mapa deixar de ser uma grade pequena de simulação.
 
@@ -54,3 +54,17 @@ O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos po
 - Como essa alteração modifica elevação, drenagem e estado inicial, o identificador atual passa para `temperate-valley-l0-v14`. Os valores de amplitude são parâmetros artísticos/engenharia, não estimativas geológicas. A apresentação usa olho a 680 m na horizontal e 1500 m acima do centro; a projeção continua ortográfica.
 - A captura `genesis-flora-v18-mesorelief.png` está no diretório de visualizações do Codex, fora do repositório. A revisão mantém a silhueta de vale e cordilheiras, com ondulações adicionais visíveis nas encostas. Ainda faltam copas mais contínuas, bancos mais orgânicos e uma água menos larga para se aproximar da referência.
 - Em Release, seeds 1–3 foram avançadas até tick 144; os hashes, populações, intervalos de elevação, resíduos de balanço e benchmark atualizados estão em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md). A suíte completa passou com 19 testes.
+
+## Geografia do cenário v15 — cristas independentes do rio
+
+- A captura v23 revelou que as cordilheiras ainda repetiam a curva do meandro. O cenário v15 dá eixos independentes às cristas principais e soma seis cristas menores ramificadas dos seus ombros em direção às margens do vale.
+- A Geosfera mantém o sampler contínuo e determinístico. Os novos campos alteram a altura física antes da geração do snapshot; D8, água inicial, gradiente solar e flora leem esse mesmo relevo. O renderizador continua somente reconstruindo a malha e ancorando objetos.
+- A decisão segue a composição de soerguimento e drenagem da literatura consultada em [15_RESEARCH](15_RESEARCH.md). Termos de forma e amplitudes secundárias são heurísticas; não simulam tectônica ou erosão e não afirmam validar geomorfologia.
+- A captura v24 `genesis-geometric-v24-ridge-network.png` e a captura final sem HUD v26 `genesis-geometric-v26-camera-depth.png` estão fora do repositório no diretório de visualizações do Codex. A inclinação maior deixa paredes e cristas mais legíveis; ainda não alcança a densidade e a delicadeza de vegetação da referência, e alguns canais seguem largos.
+- `dotnet test Game.sln -c Release --nologo`: 22/22 aprovados. Seeds 1–3 avançaram até tick 144 com balanços conservativos dentro das tolerâncias. Benchmark de 60 s: média 58.62 FPS, P95 19.90 ms, P99 48.43 ms, working set 201.5 MiB; atende ao gate N4 do documento [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
+
+## Apresentação v26 — leitura do relevo e cursos curvos
+
+- A câmera ortográfica passou de 24° para aproximadamente 30° da vertical (880 m horizontal, 1500 m de elevação), ampliando a leitura das faces físicas. O ribbon do rio interpola os receptores D8 por curvas Catmull–Rom, e cada vértice continua consultando a elevação do terreno; o campo hidrológico não muda.
+- A captura de revisão omite o HUD apenas no modo `--capture`; o jogo interativo continua com a interface normal. Veja `genesis-geometric-v26-camera-depth.png` no diretório de visualizações do Codex.
+- A cena destaca melhor o paredão e as encostas, mas ainda deixa canais largos e bosques em blocos de densidade visíveis. Em Release, 60 s: média 57.67 FPS, P95 30.52 ms, P99 49.53 ms, working set 198.2 MiB; cumpre as metas N4.

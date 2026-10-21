@@ -46,6 +46,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private readonly int? _benchmarkDurationSeconds;
     private readonly List<double> _benchmarkFrameTimesMs = [];
     private readonly Dictionary<VisualKey, Texture2D> _visualCache = [];
+    private readonly Dictionary<(ulong Seed, double East, double North), double> _visualAnchorElevations = [];
     private readonly List<GroundSprite> _groundSprites = [];
     private readonly Dictionary<char, string[]> _glyphs = TinyFont.Glyphs;
     private SpriteBatch _batch = null!;
@@ -97,6 +98,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     public NaturalWorldGame(string? capturePath, int? benchmarkDurationSeconds)
     {
         _capturePath = capturePath;
+        _showHud = capturePath is null;
         _benchmarkDurationSeconds = benchmarkDurationSeconds;
         _graphics = new GraphicsDeviceManager(this)
         {
@@ -346,7 +348,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.56;
                 var rockWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x524F434B504F535AUL,
                     (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.56;
-                var rockElevation = _terrainHeightSampler(rockWorldX / Tile, rockWorldZ / Tile);
+                var rockElevation = VisualAnchorElevation(rockWorldX / Tile, rockWorldZ / Tile);
                 var rockGround = ProjectGround(rockWorldX, rockElevation, rockWorldZ);
                 Add(new(VisualKind.Rock, rockVariant, 1, VisualSeason), rockGround,
                     (int)rockGround.X - rockWidth / 2, (int)rockGround.Y - rockHeight + 4,
@@ -379,7 +381,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                             (ulong)cell.Index, (ulong)tuft, 0, 0) - 0.5) * Tile * 0.72;
                         var tuftWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x4752415353504F5AUL,
                             (ulong)cell.Index, (ulong)tuft, 0, 0) - 0.5) * Tile * 0.72;
-                        var tuftElevation = _terrainHeightSampler(tuftWorldX / Tile, tuftWorldZ / Tile);
+                        var tuftElevation = VisualAnchorElevation(tuftWorldX / Tile, tuftWorldZ / Tile);
                         var tuftGround = ProjectGround(tuftWorldX, tuftElevation, tuftWorldZ);
                         var offsetY = (int)(tuftSeed >> 14 & 7) - 3 - (tuft == 1 ? 2 : 0);
                         Add(new(VisualKind.Grass, (int)(tuftSeed >> 8 & 15), bucket, VisualSeason), tuftGround,
@@ -400,7 +402,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                             (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.72;
                         var flowerWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x464C4F57504F535AUL,
                             (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.72;
-                        var flowerElevation = _terrainHeightSampler(flowerWorldX / Tile, flowerWorldZ / Tile);
+                        var flowerElevation = VisualAnchorElevation(flowerWorldX / Tile, flowerWorldZ / Tile);
                         var flowerGround = ProjectGround(flowerWorldX, flowerElevation, flowerWorldZ);
                         Add(new(VisualKind.Wildflower, (int)(flowerSeed >> 16 & 7), bucket, VisualSeason), flowerGround,
                             (int)flowerGround.X - flowerWidth / 2,
@@ -426,7 +428,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                         (ulong)cell.Index, (ulong)tree, 0, 0) - 0.5) * Tile * 0.68;
                     var treeWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x54524545504F535AUL,
                         (ulong)cell.Index, (ulong)tree, 0, 0) - 0.5) * Tile * 0.68;
-                    var treeElevation = _terrainHeightSampler(treeWorldX / Tile, treeWorldZ / Tile);
+                    var treeElevation = VisualAnchorElevation(treeWorldX / Tile, treeWorldZ / Tile);
                     var treeGround = ProjectGround(treeWorldX, treeElevation, treeWorldZ);
                     var artVariant = speciesRow * 4 + (int)(treeSeed >> 11 & 3);
                     var shadowWidth = size + 12 + (int)(treeSeed & 5);
@@ -483,6 +485,15 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         ulong Seed, int Size, int ArtVariant, int ShadowWidth, double WorldZ, Vector3 Ground);
 
     private readonly record struct GroundSprite(VisualKey Key, Rectangle Destination, float Depth, int SortOrder);
+
+    private double VisualAnchorElevation(double eastCell, double northCell)
+    {
+        var key = (_snapshot.Seed, eastCell, northCell);
+        if (_visualAnchorElevations.TryGetValue(key, out var elevation)) return elevation;
+        elevation = _terrainHeightSampler(eastCell, northCell);
+        _visualAnchorElevations.Add(key, elevation);
+        return elevation;
+    }
 
     private void DrawHud()
     {
@@ -1332,24 +1343,29 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
         void AddSmoothedRibbon(IReadOnlyList<int> chain)
         {
-            var path = chain.Select(index =>
+            var controlPoints = chain.Select(index =>
             {
                 var cell = _snapshot.Cells[index];
                 return (Point: Center(cell), Radius: HalfWidthM(accumulation[index]),
                     Depth: Math.Max(20, CellDepth(index)));
             }).ToList();
-            for (var iteration = 0; iteration < 2 && path.Count >= 2; iteration++)
+            var path = new List<(Vector2 Point, float Radius, double Depth)>
             {
-                var smoothed = new List<(Vector2 Point, float Radius, double Depth)> { path[0] };
-                for (var index = 0; index < path.Count - 1; index++)
+                controlPoints[0]
+            };
+            for (var segment = 0; segment < controlPoints.Count - 1; segment++)
+            {
+                var p0 = controlPoints[Math.Max(0, segment - 1)];
+                var p1 = controlPoints[segment];
+                var p2 = controlPoints[segment + 1];
+                var p3 = controlPoints[Math.Min(controlPoints.Count - 1, segment + 2)];
+                for (var sample = 1; sample <= 4; sample++)
                 {
-                    var first = path[index];
-                    var second = path[index + 1];
-                    smoothed.Add(Interpolate(first, second, 0.25f));
-                    smoothed.Add(Interpolate(first, second, 0.75f));
+                    var t = sample * 0.25f;
+                    path.Add((CatmullRom(p0.Point, p1.Point, p2.Point, p3.Point, t),
+                        MathHelper.Lerp(p1.Radius, p2.Radius, t),
+                        p1.Depth + (p2.Depth - p1.Depth) * t));
                 }
-                smoothed.Add(path[^1]);
-                path = smoothed;
             }
 
             var left = new Vector3[path.Count];
@@ -1376,13 +1392,14 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 AddTriangle(right[index], right[index + 1], left[index + 1], baseWater, baseWater, baseWater);
             }
 
-            static (Vector2 Point, float Radius, double Depth) Interpolate(
-                (Vector2 Point, float Radius, double Depth) first,
-                (Vector2 Point, float Radius, double Depth) second,
-                float amount)
-                => (Vector2.Lerp(first.Point, second.Point, amount),
-                    MathHelper.Lerp(first.Radius, second.Radius, amount),
-                    first.Depth + (second.Depth - first.Depth) * amount);
+            static Vector2 CatmullRom(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float t)
+            {
+                var t2 = t * t;
+                var t3 = t2 * t;
+                return 0.5f * ((2 * p1) + (-p0 + p2) * t
+                    + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
+                    + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+            }
         }
 
         void AddWaterfallIfTerrainDrops(
@@ -1481,7 +1498,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void UpdateCamera()
     {
         var target = new Vector3(TerrainExtentM * 0.5f, (float)_centerElevationM, TerrainExtentM * 0.5f);
-        var horizontal = 680f;
+        var horizontal = 880f;
         var elevation = 1500f;
         var eye = target + new Vector3(0, elevation, horizontal);
         _view = Matrix.CreateLookAt(eye, target, Vector3.Up);

@@ -8,7 +8,7 @@ As equações abaixo são o contrato L0 para a implementação futura. Os valore
 
 | Parâmetro | Valor L0 |
 |---|---:|
-| `scenarioId` | `temperate-valley-l0-v14` |
+| `scenarioId` | `temperate-valley-l0-v15` |
 | Seed canônica | `1` (hexadecimal `0x0000000000000001`) |
 | Seeds de integração | `1`, `2`, `3` |
 | Grade | 64 × 64 células finitas; simular a grade toda, mesmo fora da câmera |
@@ -422,6 +422,20 @@ Em Release, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e 
 
 ### Apresentação v23 — grama, âncoras e composição em profundidade
 
-A revisão aumenta a resolução do autotile para até 8 × 8 subcélulas, acrescenta variação de pigmento de solo e umidade sem alterar biomassa e posiciona cada elemento visual em coordenadas determinísticas dentro da célula. Cada objeto consulta a elevação física; os sprites são compostos de trás para frente conforme a profundidade projetada da câmera, e as posições ficam cacheadas por snapshot, resolução e estação. O cenário físico permanece v14.
+A revisão aumenta a resolução do autotile para até 8 × 8 subcélulas, acrescenta variação de pigmento de solo e umidade sem alterar biomassa e posiciona cada elemento visual em coordenadas determinísticas dentro da célula. Cada objeto consulta a elevação física; os sprites são compostos de trás para frente conforme a profundidade projetada da câmera, e as posições ficam cacheadas por snapshot, resolução e estação. Essa apresentação é da revisão v23; o cenário físico atual é v15.
 
 Em Release, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição de 60 s. Resultado: 3518 quadros, média de 58.63 FPS, P95 de 21.74 ms, P99 de 50.39 ms, CPU de 53.5% de um núcleo e working set de 171.4 MiB. P95 cumpre a meta; P99 excede 50 ms por 0.39 ms nesta amostra. SHA256 de `Game.Client.Desktop.dll`: `204DCDBE327BC2F3DEED33000F40614DE15715E945AEF35657B6E5AC7F7FE6C7`. Captura `genesis-geometric-v23-depth-sort.png`; resultado bruto `genesis-render-benchmark-v23-depth-sort.txt` está no diretório de visualizações do Codex. A captura confirma a malha geométrica e as âncoras sobre o relevo, mas ainda mostra canais largos, cobertura vegetal em manchas e geografia menos variada que a referência.
+
+### Geografia v15 — soerguimento independente e cristas ramificadas
+
+O cenário v15 rompe o acoplamento geométrico entre os eixos das duas cordilheiras e o centro do rio: as cristas principais têm posição, inclinação, curvatura e segmentação determinísticas próprias. A âncora oeste é `x=12..16` células e a leste `x=48..52`; cada eixo varia ±0.12 célula por linha, soma duas curvas senoidais e uma deriva de ruído limitado a ±3.5 células. As larguras dos ombros são 4.0–5.6 células e as amplitudes 78–114 m. Seis cristas secundárias mais baixas, três por lado, partem dos ombros montanhosos e avançam em curvas para as margens do vale; usam largura 1.65–2.35 células e amplitude 15–23 m, com afunilamento longitudinal. O vale meandrante permanece uma feição separada. A altitude combinada continua sendo a única entrada para a drenagem D8, formação da água inicial, inclinação e colocação de flora. As larguras e amplitudes secundárias são parâmetros heurísticos de engenharia; esta implementação não simula tectônica nem erosão.
+
+`dotnet test Game.sln -c Release --nologo`: 22/22 aprovados, incluindo repetibilidade, flexão dos dois eixos de crista, D8 descendente, faces de afloramento e bordas coincidentes de chunks. Seeds 1–3 avançaram até tick 144. Elevações: seed 1 `18.2–161.0 m`, seed 2 `20.2–161.3 m`, seed 3 `17.7–162.8 m`; balanços máximos absolutos nos três casos: água `1.471×10⁻⁶ L`, matéria seca `3.045×10⁻⁶ g`, N `1.490×10⁻⁸ g`. Hashes SHA256: seed 1 `885C9C8C069AA60A8446199A379D9FA5452E41A17FD56E658F285BCDEDF47E41`, seed 2 `36EABA00FC0017277651CC8C3DEE312E979A846F52DBD02178F3F3F9309938DD`, seed 3 `16CBFF582232F5D6F51E0B8BA7D8EB1984B0FEF52BD37915F97DAC4AC8650B21`.
+
+Benchmark Release, seed 1, 1280 × 720, 6 ticks/s, aquecimento de 5 s e medição de 60 s: 3517 quadros, média 58.62 FPS, P95 19.90 ms, P99 48.43 ms, CPU 58.4% de um núcleo e working set 201.5 MiB. Cumpre as metas N4 de FPS, percentis de quadro e memória desktop definidas acima. SHA256 de `Game.Client.Desktop.dll`: `4B958DE7156108C0115AF8B48FF73E9F93E362546DE554E9E3CB4F651D212A1B`; `Game.Modules.Geosphere.dll`: `F0CF904A047F002F4CF5588307218B05B01C92795A9B086B58FB07DC94C40E55`. Captura `genesis-geometric-v24-ridge-network.png` e resultado bruto `genesis-render-benchmark-v24-ridge-network.txt` foram guardados no diretório de visualizações do Codex, fora do repositório. A captura mostra cristas ramificadas e cursos laterais sobre geometria real; ainda há canais largos e bosques em manchas em relação à referência.
+
+### Apresentação v26 — câmera inclinada e drenagem suavizada
+
+O cliente usa ângulo aproximado de 30° da vertical, ainda ortográfico; as fitas visuais dos cursos D8 são interpoladas por Catmull–Rom e amostram a elevação em cada ponto. O modo `--capture` oculta o HUD para produzir uma imagem limpa de revisão. Nada disso muda o cenário v15 nem a simulação.
+
+Em Release, seed 1, 1280 × 720, 6 ticks/s, aquecimento de 5 s e medição de 60 s: 3461 quadros, média 57.67 FPS, P95 30.52 ms, P99 49.53 ms, CPU 57.4% de um núcleo e working set 198.2 MiB. A amostra cumpre N4 e memória desktop. SHA256 de `Game.Client.Desktop.dll`: `CAA672EBB0E35E95707AECAAC15A6231CE4FBDF24D43A569696E32A59E396294`; `Game.Modules.Geosphere.dll`: `F0CF904A047F002F4CF5588307218B05B01C92795A9B086B58FB07DC94C40E55`. Captura `genesis-geometric-v26-camera-depth.png` e resultado bruto `genesis-render-benchmark-v26-camera-depth.txt` ficam no diretório de visualizações do Codex. A inclinação deixa os paredões mais legíveis; a água ainda cobre áreas largas e a floresta mantém bordas em manchas.

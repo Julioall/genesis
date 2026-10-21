@@ -49,7 +49,7 @@ var wetBands = new[] { 20, 100, 250, 500, 1_000 }
 var minimumElevation = snapshot.Cells.Min(c => c.ElevationM);
 var maximumElevation = snapshot.Cells.Max(c => c.ElevationM);
 var maximumSurfaceWater = snapshot.Cells.Max(c => c.SurfaceWaterMm);
-Console.WriteLine($"scenario=temperate-valley-l0-v14 seed={snapshot.Seed} tick={snapshot.TickIndex} day={snapshot.DayOfYear}");
+Console.WriteLine($"scenario=temperate-valley-l0-v15 seed={snapshot.Seed} tick={snapshot.TickIndex} day={snapshot.DayOfYear}");
 Console.WriteLine($"cells={snapshot.Cells.Count} grass-patches={grass} woody-patches={woody}");
 Console.WriteLine($"elevation-range-m={minimumElevation:F1}..{maximumElevation:F1} wet-cells={wetCells} max-surface-water-mm={maximumSurfaceWater:F1}");
 Console.WriteLine($"water-depth-bands-mm={string.Join(' ', wetBands)}");
