@@ -12,12 +12,14 @@ game.Run();
 internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 {
     private const int Tile = 10;
-    private const float MapLeft = 0;
-    private const float MapTop = 2;
-    private const float GroundM11 = 2.45f;
-    private const float GroundM12 = 0.05f;
-    private const float GroundM21 = 0.12f;
-    private const float GroundM22 = 1.28f;
+    private const float GroundM11 = 2.10f;
+    private const float GroundM12 = 0.035f;
+    private const float GroundM21 = 0.18f;
+    private const float GroundM22 = 1.11f;
+    private float MapLeft => (GraphicsDevice.Viewport.Width
+        - SimulationState.Width * Tile * (GroundM11 + GroundM21)) / 2f;
+    private float MapTop => (GraphicsDevice.Viewport.Height
+        - SimulationState.Height * Tile * (GroundM12 + GroundM22)) / 2f + 18f;
     private static readonly int[] DepthOrder = Enumerable.Range(0, SimulationState.Width * SimulationState.Height)
         .OrderBy(index => index / SimulationState.Width * GroundM22 + index % SimulationState.Width * GroundM12)
         .ToArray();
@@ -35,6 +37,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private KeyboardState _previous;
     private double _tickAccumulator;
     private bool _paused;
+    private bool _showHud = true;
     private int _overlayMode;
     private int _visualSeasonIndex = (int)Season.Summer;
     private int _speedIndex = 2;
@@ -75,6 +78,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         if (Pressed(keyboard, Keys.D1)) _overlayMode = 0;
         if (Pressed(keyboard, Keys.D2)) _overlayMode = 1;
         if (Pressed(keyboard, Keys.D3)) _overlayMode = 2;
+        if (Pressed(keyboard, Keys.H)) _showHud = !_showHud;
         if (Pressed(keyboard, Keys.V))
         {
             _visualSeasonIndex = (_visualSeasonIndex + 1) % 4;
@@ -112,7 +116,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
         _batch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.AlphaBlend);
         DrawGroundObjects();
-        DrawHud();
+        if (_showHud) DrawHud();
         _batch.End();
         base.Draw(gameTime);
     }
@@ -129,7 +133,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             if (cell.Woody.Present && cell.Woody.BiomassGPerM2 > 1)
             {
                 var bucket = Math.Clamp((int)(cell.Woody.BiomassGPerM2 / 450), 1, 4);
-                var size = 27 + bucket * 5;
+                var size = 31 + bucket * 6;
                 var shadowWidth = size + 12 + (int)(visualSeed & 5);
                 DrawSprite(TextureFor(new(VisualKind.Shadow, (int)(visualSeed & 7), bucket, VisualSeason)),
                     (int)ground.X - shadowWidth / 2 + 7, (int)ground.Y - Math.Max(4, size / 5), shadowWidth,
@@ -167,7 +171,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             {
                 var bucket = Math.Clamp((int)(cell.Woody.BiomassGPerM2 / 450), 1, 4);
                 var texture = TextureFor(new(VisualKind.Woody, (int)(visualSeed >> 16 & 7), bucket, VisualSeason));
-                var size = 27 + bucket * 5;
+                var size = 31 + bucket * 6;
                 DrawSprite(texture, (int)ground.X - size / 2, (int)ground.Y - size + 5, size, size);
             }
         }
@@ -175,29 +179,19 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
     private void DrawHud()
     {
-        var day = _snapshot.DayOfYear.ToString("D3");
-        DrawText($"GENESIS  /  TEMPERATE VALLEY", 34, 26, new Color(231, 226, 201), 2);
-        DrawText($"DAY {day} {SeasonName(_snapshot.Season)}   TICK {_snapshot.TickIndex}", 36, 50, new Color(149, 203, 190), 1);
-        var mode = _overlayMode switch { 1 => "SOIL WATER", 2 => "BIOMASS", _ => "TERRAIN" };
-        const int panelX = 1260;
-        _batch.Draw(_pixel, new Rectangle(1238, 24, 338, 852), new Color(10, 18, 20, 206));
-        _batch.Draw(_pixel, new Rectangle(1238, 24, 2, 852), new Color(144, 159, 129, 190));
-        DrawText("WORLD VIEW", panelX, 46, new Color(232, 223, 194), 2);
-        DrawText($"{mode}   {(_paused ? "PAUSED" : $"RUN {Speeds[_speedIndex]} TICKS/S")}", panelX, 71, new Color(149, 203, 190), 1);
-        DrawText($"ART {SeasonName(VisualSeason)} / SIM {SeasonName(_snapshot.Season)}", panelX, 91, new Color(178, 171, 133), 1);
-        DrawText("CONTROLS", panelX, 112, new Color(178, 171, 133), 1);
-        DrawText("1 TERRAIN", panelX, 132, new Color(207, 216, 207), 1);
-        DrawText("2 SOIL MOISTURE", panelX, 150, new Color(207, 216, 207), 1);
-        DrawText("3 BIOMASS", panelX, 168, new Color(207, 216, 207), 1);
-        DrawText("SPACE PAUSE   +/- SPEED", panelX, 192, new Color(207, 216, 207), 1);
-        DrawText("F5 SAVE   F9 LOAD", panelX, 210, new Color(207, 216, 207), 1);
-        DrawText("V CYCLE ART SEASON", panelX, 228, new Color(207, 216, 207), 1);
-        DrawText("SURFACE", panelX, 258, new Color(178, 171, 133), 1);
-        DrawLegend(panelX, 278, new Color(103, 128, 76), "GRASS PATCH");
-        DrawLegend(panelX, 298, new Color(103, 146, 82), "TREES + LEAVES");
-        DrawLegend(panelX, 318, new Color(76, 132, 178), "SURFACE WATER");
-        DrawLegend(panelX, 338, new Color(126, 127, 121), "ROCK OUTCROPS");
-        DrawText("SEASONS CHANGE FOLIAGE", panelX, 374, new Color(178, 171, 133), 1);
+        var viewport = GraphicsDevice.Viewport;
+        var mode = _overlayMode switch { 1 => "SOIL WATER", 2 => "BIOMASS", _ => "LANDSCAPE" };
+        const int cardX = 22;
+        const int cardY = 20;
+        const int cardWidth = 560;
+        const int cardHeight = 90;
+        _batch.Draw(_pixel, new Rectangle(cardX, cardY, cardWidth, cardHeight), new Color(10, 18, 20, 174));
+        _batch.Draw(_pixel, new Rectangle(cardX, cardY, 3, cardHeight), new Color(157, 174, 112, 225));
+        DrawText("GENESIS  /  TEMPERATE VALLEY", cardX + 20, cardY + 13, new Color(231, 226, 201), 2);
+        DrawText($"DAY {_snapshot.DayOfYear:D3} {SeasonName(_snapshot.Season)}  ART {SeasonName(VisualSeason)}  {mode}",
+            cardX + 21, cardY + 42, new Color(149, 203, 190), 1);
+        DrawText($"{(_paused ? "PAUSED" : $"RUN {Speeds[_speedIndex]} TICKS/S")}  1 LAND  2 WATER  3 BIOMASS  SPACE PAUSE  H HIDE",
+            cardX + 21, cardY + 61, new Color(207, 216, 207), 1);
 
         var mouse = Mouse.GetState();
         var screenX = mouse.X - MapLeft;
@@ -210,13 +204,18 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         if (x >= 0 && x < SimulationState.Width && y >= 0 && y < SimulationState.Height)
         {
             var cell = _snapshot.Cells[y * SimulationState.Width + x];
-            var info = $"CELL {cell.Index}  Z {cell.ElevationM:F0}M  S {cell.SoilWaterMm:F1}MM  W {cell.SurfaceWaterMm:F1}MM";
-            DrawText(info, panelX, 430, new Color(228, 220, 196), 1);
-            DrawText($"N {cell.MineralNitrogenGPerM2:F2}G/M2  GRASS {cell.Grass.BiomassGPerM2:F0}  WOODY {cell.Woody.BiomassGPerM2:F0}", panelX, 448, new Color(184, 204, 178), 1);
-            DrawText($"SEEDS {(cell.Grass.SeedBankGPerM2 + cell.Woody.SeedBankGPerM2):F2}G/M2  LITTER {cell.DetritusDryGPerM2:F1}G/M2", panelX, 466, new Color(180, 188, 157), 1);
+            const int inspectWidth = 390;
+            const int inspectHeight = 52;
+            var inspectX = Math.Clamp(mouse.X + 18, 12, viewport.Width - inspectWidth - 12);
+            var inspectY = Math.Clamp(mouse.Y + 18, 12, viewport.Height - inspectHeight - 12);
+            _batch.Draw(_pixel, new Rectangle(inspectX, inspectY, inspectWidth, inspectHeight), new Color(10, 18, 20, 188));
+            DrawText($"CELL {cell.Index}  Z {cell.ElevationM:F0}M  WATER {cell.SurfaceWaterMm:F1}MM",
+                inspectX + 10, inspectY + 9, new Color(228, 220, 196), 1);
+            DrawText($"GRASS {cell.Grass.BiomassGPerM2:F0}  WOODY {cell.Woody.BiomassGPerM2:F0}  SOIL {cell.SoilWaterMm:F0}MM",
+                inspectX + 10, inspectY + 28, new Color(184, 204, 178), 1);
         }
-        DrawText($"SEED {_snapshot.Seed}   VISUAL CACHE {_visualCache.Count}", panelX, 820, new Color(125, 145, 143), 1);
-        DrawText("NO FAUNA IN THIS BUILD", panelX, 840, new Color(125, 145, 143), 1);
+        DrawText($"SEED {_snapshot.Seed}   NO FAUNA IN THIS BUILD", 26, viewport.Height - 24,
+            new Color(220, 225, 210, 210), 1);
     }
 
     private void DrawLegend(int x, int y, Color color, string text)
@@ -247,7 +246,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             VisualKind.Rock => (24, 20),
             VisualKind.Grass => (18, 15),
             VisualKind.Shadow => (24, 12),
-            _ => (40, 40)
+            _ => (64, 64)
         };
         var pixels = new Color[width * height];
         void Put(int x, int y, Color color)
@@ -337,88 +336,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         }
         else if (key.Kind == VisualKind.Woody)
         {
-            var bark = new Color(79, 58, 42);
-            var barkLight = new Color(139, 104, 68);
-            var foliage = LeafColor(key.Season, key.Variant);
-            var form = key.Variant % 8;
-            var conifer = form >= 5;
-            var center = 19 + (key.Variant % 3) - 1;
-            var trunkWidth = key.BiomassBucket >= 3 ? 3 : 2;
-            for (var x = center - trunkWidth / 2; x <= center + trunkWidth / 2; x++)
-                Line(pixels, width, height, x, height - 1, center + (x - center) / 2, conifer ? 4 : 18 + (key.Variant % 3), x % 2 == 0 ? barkLight : bark);
-
-            if (conifer)
-            {
-                for (var tier = 0; tier < 6; tier++)
-                {
-                    var branchY = 8 + tier * 4;
-                    var span = 3 + tier * 2;
-                    var branchColor = tier % 2 == 0 ? new Color(45, 79, 48) : new Color(60, 99, 55);
-                    Line(pixels, width, height, center, branchY, center - span, branchY + 5, branchColor);
-                    Line(pixels, width, height, center, branchY, center + span, branchY + 5, branchColor);
-                    Line(pixels, width, height, center - span, branchY + 5, center + span, branchY + 5, branchColor);
-                }
-                for (var py = 3; py < 34; py++)
-                {
-                    var halfWidth = 2 + (py - 3) * 0.47;
-                    for (var px = 0; px < width; px++)
-                    {
-                        var rough = ((px * 17 + py * 29 + key.Variant * 13) % 7) * 0.28 - 0.7;
-                        if (Math.Abs(px - center) > halfWidth + rough || (py + key.Variant) % 5 == 0 && Math.Abs(px - center) > 3) continue;
-                        var shade = px < center - 3 && py < 25 ? 1.22f : (px + py) % 6 == 0 ? 0.68f : 1f;
-                        Put(px, py, Shade(branchColorFor(py), shade));
-                    }
-                }
-                for (var tier = 0; tier < 6; tier++)
-                {
-                    var branchY = 8 + tier * 4;
-                    var span = 3 + tier * 2;
-                    var branch = Shade(branchColorFor(branchY), 0.62f);
-                    Line(pixels, width, height, center, branchY, center - span, branchY + 5, branch);
-                    Line(pixels, width, height, center, branchY, center + span, branchY + 5, branch);
-                }
-                for (var x = center - 1; x <= center + 1; x++)
-                    Line(pixels, width, height, x, height - 1, center, 5, x % 2 == 0 ? barkLight : bark);
-            }
-            else
-            {
-                var branchPoints = form < 3
-                    ? new[] { (center, 31, 8, 17), (center, 29, 31, 16), (center, 25, 12, 10), (center, 23, 27, 9), (center, 33, 13, 25), (center, 31, 26, 24) }
-                    : new[] { (center, 31, 11, 19), (center, 28, 29, 18), (center, 24, 13, 12), (center, 22, 26, 11), (center, 34, 14, 26), (center, 32, 25, 25) };
-                foreach (var (x1, y1, x2, y2) in branchPoints) Line(pixels, width, height, x1, y1, x2, y2, bark);
-
-                if (key.Season != Season.Winter)
-                {
-                    var clusters = form < 3
-                        ? new[] { (10, 17, 7, 6), (19, 10, 8, 8), (29, 15, 7, 7), (11, 25, 7, 6), (21, 23, 9, 8), (30, 24, 7, 6) }
-                        : new[] { (13, 17, 8, 9), (21, 10, 8, 8), (28, 18, 8, 9), (20, 24, 10, 8) };
-                    foreach (var (cx, cy, rx, ry) in clusters)
-                    for (var py = Math.Max(1, cy - ry); py <= Math.Min(height - 1, cy + ry); py++)
-                    for (var px = Math.Max(1, cx - rx); px <= Math.Min(width - 2, cx + rx); px++)
-                    {
-                        var dx = (px - cx) / (double)rx;
-                        var dy = (py - cy) / (double)ry;
-                        var textureNoise = (px * 13 + py * 7 + key.Variant * 11) % 17;
-                        var roughness = textureNoise % 5 * 0.045;
-                        if (dx * dx + dy * dy > 1.03 + roughness || textureNoise == 0 || textureNoise == 9) continue;
-                        var shade = py < cy - 2 && px < cx ? 1.2f : py > cy + 2 || px > cx ? 0.76f : textureNoise % 6 == 0 ? 1.12f : 0.96f;
-                        Put(px, py, Shade(foliage, shade));
-                    }
-                    // Fine branch lines placed over the leaf masses remain visible through natural gaps.
-                    foreach (var (x1, y1, x2, y2) in branchPoints)
-                        Line(pixels, width, height, x1, y1, x2, y2, bark);
-                }
-            }
-
-            Color branchColorFor(int py) => py < 18 ? new Color(55, 91, 51) : new Color(67, 105, 58);
-            if (!conifer && key.Season == Season.Winter)
-            {
-                // A bare deciduous crown remains visible, with several fine tips against the ground.
-                Line(pixels, width, height, center, 23, center - 11, 12, barkLight);
-                Line(pixels, width, height, center, 22, center + 12, 10, barkLight);
-                Line(pixels, width, height, center, 25, center - 8, 18, barkLight);
-                Line(pixels, width, height, center, 26, center + 10, 17, barkLight);
-            }
+            DrawTreePixels(pixels, width, height, key);
         }
         else
         {
@@ -443,6 +361,147 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             var twice = 2 * error;
             if (twice >= dy) { error += dy; x0 += sx; }
             if (twice <= dx) { error += dx; y0 += sy; }
+        }
+    }
+
+    private static void DrawTreePixels(Color[] pixels, int width, int height, VisualKey key)
+    {
+        var center = width / 2 + key.Variant % 5 - 2;
+        var conifer = key.Variant % 8 >= 4;
+        var bark = new Color(78, 55, 38);
+        var barkLight = new Color(132, 96, 61);
+        var trunkWidth = key.BiomassBucket >= 3 ? 3 : 2;
+
+        double Roll(int index, ulong salt) => CounterRandom.Unit(
+            (ulong)(key.Variant + 1), salt, (ulong)index, (ulong)key.BiomassBucket, 0, 0);
+        void Put(int x, int y, Color color)
+        {
+            if (x >= 0 && x < width && y >= 0 && y < height)
+                pixels[y * width + x] = color;
+        }
+
+        if (conifer)
+        {
+            var pine = new[]
+            {
+                new Color(34, 66, 43), new Color(43, 78, 49), new Color(49, 86, 51),
+                new Color(40, 75, 48)
+            }[key.Variant % 4];
+            for (var tier = 0; tier < 12; tier++)
+            {
+                var progress = tier / 11.0;
+                var y = 8 + tier * 4;
+                var span = 4 + (int)(progress * 21);
+                var drop = 3 + (int)((1 - progress) * 4) + (int)(Roll(tier, 0x50494E4554494552UL) * 3);
+                var shade = tier % 3 == 0 ? 1.13f : tier % 3 == 1 ? 0.91f : 1.0f;
+                var bough = Shade(pine, shade);
+                Line(pixels, width, height, center, y, center - span, y + drop, Shade(bough, 0.78f));
+                Line(pixels, width, height, center, y, center + span, y + drop, Shade(bough, 0.72f));
+
+                for (var px = Math.Max(0, center - span); px <= Math.Min(width - 1, center + span); px++)
+                {
+                    var taper = 1 - Math.Abs(px - center) / (double)span;
+                    var fringe = (int)(taper * (3 + progress * 4));
+                    var top = y + Math.Max(0, (int)(Math.Abs(px - center) * 0.16) - 1);
+                    for (var py = top; py <= y + drop + fringe; py++)
+                    {
+                        var grain = (px * 17 + py * 29 + key.Variant * 13 + tier * 7) % 19;
+                        if (grain == 0 || grain == 11 && taper < 0.45) continue;
+                        var light = px < center - span * 0.2 && py < y + drop ? 1.17f : grain % 7 == 0 ? 0.76f : 1.0f;
+                        Put(px, py, Shade(bough, light));
+                    }
+                }
+                if (tier % 2 == 0)
+                    Put(center - span + 1, y + drop, Shade(pine, 1.36f));
+            }
+
+            // A dark central leader and a few gaps keep the crown from reading as a flat triangle.
+            for (var x = center - 1; x <= center + 1; x++)
+                Line(pixels, width, height, x, height - 2, center + (x - center) / 2, 5, x % 2 == 0 ? barkLight : bark);
+        }
+        else
+        {
+            var crown = LeafColor(key.Season, key.Variant);
+            var branchCount = 18;
+            for (var branch = 0; branch < branchCount; branch++)
+            {
+                var side = branch % 2 == 0 ? -1 : 1;
+                var level = branch / 2;
+                var anchorY = 47 - level * 3;
+                var spread = 9 + (int)(Roll(branch, 0x4F414B4252414E43UL) * 17);
+                var tipY = anchorY - 5 - (int)(Roll(branch, 0x4252414E43485249UL) * 11);
+                Line(pixels, width, height, center, anchorY, center + side * spread, tipY,
+                    branch % 3 == 0 ? barkLight : bark);
+                if (branch % 3 == 0)
+                    Line(pixels, width, height, center + side * (spread / 2), anchorY - 2,
+                        center + side * (spread + 3), tipY - 4, bark);
+            }
+
+            if (key.Season != Season.Winter)
+            {
+                // Rounded, overlapping leaf masses use irregular silhouettes and a lit canopy edge.
+                const int clusterCount = 11;
+                for (var cluster = 0; cluster < clusterCount; cluster++)
+                {
+                    var angle = Math.PI * 2 * cluster / clusterCount - Math.PI / 2
+                        + (Roll(cluster, 0x4C454146414E474CUL) - 0.5) * 0.42;
+                    var radius = 11 + (int)(Roll(cluster, 0x4C45414652414449UL) * 7);
+                    var cx = center + (int)Math.Round(Math.Cos(angle) * radius);
+                    var cy = 28 + (int)Math.Round(Math.Sin(angle) * radius * 0.68);
+                    var rx = 8 + (int)(Roll(cluster, 0x4C45414657494454UL) * 5);
+                    var ry = 7 + (int)(Roll(cluster, 0x4C45414648454947UL) * 5);
+                    var clusterColor = Shade(crown, (cluster % 4) switch
+                    {
+                        0 => 0.76f,
+                        1 => 1.12f,
+                        2 => 0.91f,
+                        _ => 1.0f
+                    });
+                    for (var py = Math.Max(2, cy - ry); py <= Math.Min(height - 3, cy + ry); py++)
+                    for (var px = Math.Max(2, cx - rx); px <= Math.Min(width - 3, cx + rx); px++)
+                    {
+                        var dx = (px - cx) / (double)rx;
+                        var dy = (py - cy) / (double)ry;
+                        var grain = (px * 13 + py * 7 + key.Variant * 11 + cluster * 17) % 23;
+                        var edgeNoise = ((grain % 7) - 3) * 0.035;
+                        if (dx * dx + dy * dy > 1.02 + edgeNoise || grain == 0 || grain == 15) continue;
+                        var lit = px < cx - 2 && py < cy ? 1.16f : py > cy + 2 || px > cx ? 0.78f : grain % 6 == 0 ? 1.13f : 0.98f;
+                        Put(px, py, Shade(clusterColor, lit));
+                        if (grain % 9 == 0) Put(px + 1, py, Shade(clusterColor, 0.72f));
+                    }
+                }
+
+                // Fine twigs and branch forks show through gaps in the leaf clusters.
+                for (var branch = 0; branch < branchCount; branch++)
+                {
+                    var side = branch % 2 == 0 ? -1 : 1;
+                    var level = branch / 2;
+                    var anchorY = 47 - level * 3;
+                    var spread = 9 + (int)(Roll(branch, 0x4F414B4252414E43UL) * 17);
+                    var tipY = anchorY - 5 - (int)(Roll(branch, 0x4252414E43485249UL) * 11);
+                    Line(pixels, width, height, center, anchorY, center + side * spread, tipY, bark);
+                }
+            }
+
+            // A curved trunk stays visible below the crown and has a sunlit edge.
+            for (var y = 24; y < height; y++)
+            {
+                var bend = (int)Math.Round(Math.Sin(y * 0.09 + key.Variant) * 1.5);
+                for (var x = -trunkWidth / 2; x <= trunkWidth / 2; x++)
+                    Put(center + bend + x, y, x < 0 ? barkLight : bark);
+            }
+            if (key.Season == Season.Winter)
+            {
+                for (var branch = 0; branch < 10; branch++)
+                {
+                    var side = branch % 2 == 0 ? -1 : 1;
+                    var y = 44 - branch * 2;
+                    var reach = 8 + (int)(Roll(branch, 0x57494E5445525457UL) * 15);
+                    Line(pixels, width, height, center, y, center + side * reach, y - 9, barkLight);
+                    Line(pixels, width, height, center + side * (reach / 2), y - 4,
+                        center + side * (reach + 3), y - 11, bark);
+                }
+            }
         }
     }
 
@@ -471,7 +530,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         return CounterRandom.Unit(visualSeed, 0x524F434BUL, (ulong)cell.Index, 0, 0, 0) < chance;
     }
 
-    private static Matrix GroundTransform()
+    private Matrix GroundTransform()
     {
         var matrix = Matrix.Identity;
         matrix.M11 = GroundM11;
