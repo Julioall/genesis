@@ -32,7 +32,25 @@ public static class CounterRandom
     public static double Unit(ulong seed, ulong tag, ulong subjectId, ulong targetId, ulong tickOrHour, ulong drawIndex)
         => (Bits(seed, tag, subjectId, targetId, tickOrHour, drawIndex) >> 11) * (1.0 / 9007199254740992.0);
 
+    public static double SpatialUnit(ulong seed, ulong tag, int x, int y, int spacing, ulong profileId, ulong scaleId)
+    {
+        if (spacing <= 0) throw new ArgumentOutOfRangeException(nameof(spacing));
+        var x0 = Math.DivRem(x, spacing, out var remainderX);
+        var y0 = Math.DivRem(y, spacing, out var remainderY);
+        var tx = Smooth(remainderX / (double)spacing);
+        var ty = Smooth(remainderY / (double)spacing);
+        var northwest = Unit(seed, tag, (ulong)x0, (ulong)y0, profileId, scaleId);
+        var northeast = Unit(seed, tag, (ulong)(x0 + 1), (ulong)y0, profileId, scaleId);
+        var southwest = Unit(seed, tag, (ulong)x0, (ulong)(y0 + 1), profileId, scaleId);
+        var southeast = Unit(seed, tag, (ulong)(x0 + 1), (ulong)(y0 + 1), profileId, scaleId);
+        var north = northwest + (northeast - northwest) * tx;
+        var south = southwest + (southeast - southwest) * tx;
+        return north + (south - north) * ty;
+    }
+
     // Visual choices have their own salt and must never consume or advance an ecology stream.
     public static ulong VisualBits(ulong seed, int cellId, ulong recipeId, ulong version = 1)
         => Bits(seed ^ 0xD1B54A32D192ED03UL, recipeId, unchecked((ulong)(uint)cellId), 0, version, 0);
+
+    private static double Smooth(double value) => value * value * (3 - 2 * value);
 }

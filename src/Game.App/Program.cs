@@ -43,8 +43,16 @@ var dryResidual = inventory.DryMatterGrams - initialInventory.DryMatterGrams
 var nitrogenResidual = inventory.NitrogenGrams - initialInventory.NitrogenGrams;
 var grass = snapshot.Cells.Count(c => c.Grass.Present);
 var woody = snapshot.Cells.Count(c => c.Woody.Present);
-Console.WriteLine($"scenario=temperate-valley-l0-v2 seed={snapshot.Seed} tick={snapshot.TickIndex} day={snapshot.DayOfYear}");
+var wetCells = snapshot.Cells.Count(c => c.SurfaceWaterMm > 0);
+var wetBands = new[] { 20, 100, 250, 500, 1_000 }
+    .Select(threshold => $">={threshold}:{snapshot.Cells.Count(c => c.SurfaceWaterMm >= threshold)}");
+var minimumElevation = snapshot.Cells.Min(c => c.ElevationM);
+var maximumElevation = snapshot.Cells.Max(c => c.ElevationM);
+var maximumSurfaceWater = snapshot.Cells.Max(c => c.SurfaceWaterMm);
+Console.WriteLine($"scenario=temperate-valley-l0-v13 seed={snapshot.Seed} tick={snapshot.TickIndex} day={snapshot.DayOfYear}");
 Console.WriteLine($"cells={snapshot.Cells.Count} grass-patches={grass} woody-patches={woody}");
+Console.WriteLine($"elevation-range-m={minimumElevation:F1}..{maximumElevation:F1} wet-cells={wetCells} max-surface-water-mm={maximumSurfaceWater:F1}");
+Console.WriteLine($"water-depth-bands-mm={string.Join(' ', wetBands)}");
 Console.WriteLine($"water-L={inventory.WaterLiters:F6} dry-matter-g={inventory.DryMatterGrams:F6} nitrogen-g={inventory.NitrogenGrams:F6}");
 Console.WriteLine($"balance-error water-L={waterResidual:E3} dry-matter-g={dryResidual:E3} nitrogen-g={nitrogenResidual:E3}");
 Console.WriteLine($"state-sha256={world.CanonicalHash()}");

@@ -24,7 +24,7 @@ Antes de implementar um processo, fechar sua ficha quantitativa usando [20_L0_MO
 
 ## Primeiro cenário de referência
 
-Usar o cenário versionado `temperate-valley-l0-v2` definido em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md), sem usar nome do jogo: campo alto, vale úmido, pequena bacia de drenagem, manchas de gramíneas e árvores ou arbustos, herbívoros simples e predadores. Dimensões e duração são parâmetros de teste, não promessas de escala. Comparar 3 sementes diagnósticas para validar variação e 1 seed canônica para regressão; ampliá-las antes de afirmar robustez.
+Usar o cenário versionado `temperate-valley-l0-v13` definido em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md), sem usar nome do jogo: cordilheiras geométricas, afloramentos com desnível físico, vale úmido, drenagem, manchas reprodutíveis de gramíneas e árvores ou arbustos, herbívoros simples e predadores. Dimensões e duração são parâmetros de teste, não promessas de escala. Comparar 3 sementes diagnósticas para validar variação e 1 seed canônica para regressão; ampliá-las antes de afirmar robustez.
 
 ## A primeira entrega não precisa incluir
 

@@ -1,23 +1,24 @@
-# Procedural-only, top-down e desempenho
+# Mundo procedural, arte pixel e desempenho
 
 As metas numéricas de desempenho e o cenário de medição L0 constam em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md); este documento não cria limites alternativos.
 
 ## Regra de produto
 
-Todos os conteúdos visuais/sonoros necessários para executar o mundo serão gerados **por receitas, parâmetros e algoritmos** mantidos pelo projeto. Isso não significa proibir MonoGame/.NET, dependências técnicas ou cache de texturas geradas em RAM/disco. Não exigir packs de PNG, spritesheets, fontes desenhadas à mão ou WAV externos para iniciar o mundo.
+O mundo físico, a simulação e os recursos visuais de runtime devem ser reproduzíveis por seed. Árvores, rochas, gramíneas, superfícies e detalhes são desenhados por receitas em código e cacheados em memória. O cliente não depende de pacotes externos de imagens, modelos ou texturas artísticas.
 
 ## Etapas independentes
 
 1. **Genesis procedural do mundo físico** por seed: elevação → drenagem → substrato → parâmetros de solo → habitats iniciais e reservatórios.
 2. **Estado vivo** por tick: água, temperatura, biomassa, detritos, população, mortalidade; nunca depender do desenho.
-3. **Receitas de aparência**: espécies funcionais → geração de tronco/copa/folhas, grama, solo, pedras, silhuetas animais e animações.
-4. **Render L0**: gerar/carregar silhuetas em cache, compor cena por chunks visuais, animações simples e UI/inspeção; atlas e LOD são otimizações posteriores.
+3. **Receitas de aparência**: espécies funcionais → geração procedural de tronco/copa/folhas, grama, solo, pedras, silhuetas animais e animações.
+4. **Render L0**: gerar e cachear receitas, compor cena por chunks visuais, animações simples e UI/inspeção; LOD é evolução posterior.
 
 O termo 'genesis' da etapa 1 descreve o processo de origem do mundo e **não autoriza** uso de `Genesis` como nome de projeto, pasta ou namespace.
 
 ## Princípios visuais
 
-- Top-down 2D, com ilusão visual 2.5D apenas nas alturas/sombras. Não inclinar recursos arbitrariamente; manter âncoras/posições coerentes com perspectiva de topo.
+- Câmera ortográfica fixa e predominantemente top-down, com relevo 3D geométrico para sustentar a leitura 2.5D. A Geosfera define elevações físicas; o cliente amostra a função contínua em malha triangulada sem decidir a geografia.
+- Plantas, pedras e gramíneas usam sprites procedurais cacheados; suas âncoras são projetadas a partir da posição e altitude do terreno. Não inclinar recursos arbitrariamente.
 - Pixel art legível; anti-alias/desfoque não devem adulterar paleta e pixels lógicos.
 - Mundo finito gerado antes do avanço; chunks visuais podem gerar recursos sob demanda para mostrar uma área maior que a tela. `seed` global estável, seeds locais derivadas por chunk, entidade, receita e versão.
 - Arbustos/árvores: parâmetros botânicos afetam morfologia procedural mas não implicam uma folha como entidade persistente.
@@ -42,4 +43,4 @@ Se for necessário usar uma fonte incorporada, registrar uma exceção explícit
 
 ## Corte visual inicial
 
-Usar silhuetas procedurais legíveis e cacheadas por grupo/estágio, terreno em chunks visuais e UI de inspeção simples. Galhos detalhados, animação hierárquica, múltiplos LODs, pools e atlas avançados só após necessidade medida. A câmera recorta renderização; todo o mapa finito continua simulado. Não exigir geração infinita nem suspensão biológica fora da tela.
+Usar silhuetas procedurais cacheadas por grupo/estágio, malha de terreno em buffers persistentes e UI de inspeção simples. A malha de água segue as faixas D8 e as áreas alagadas do snapshot. Chunks e LOD são otimizações posteriores. A câmera recorta renderização; todo o mapa finito continua simulado. Não exigir geração infinita nem suspensão biológica fora da tela.

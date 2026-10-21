@@ -41,3 +41,4 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Resultado da revisão e limites do parecer](18_DOCUMENT_REVIEW.md)
 - [Regras de codificação](19_CODING_RULES.md)
 - [Modelos L0, equações, parâmetros e metas](20_L0_MODEL_AND_BENCHMARKS.md)
+- [Terreno geométrico 2.5D](21_GEOMETRIC_TERRAIN.md)

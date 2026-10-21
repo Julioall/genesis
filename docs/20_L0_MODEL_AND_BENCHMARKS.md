@@ -8,7 +8,7 @@ As equações abaixo são o contrato L0 para a implementação futura. Os valore
 
 | Parâmetro | Valor L0 |
 |---|---:|
-| `scenarioId` | `temperate-valley-l0-v2` |
+| `scenarioId` | `temperate-valley-l0-v13` |
 | Seed canônica | `1` (hexadecimal `0x0000000000000001`) |
 | Seeds de integração | `1`, `2`, `3` |
 | Grade | 64 × 64 células finitas; simular a grade toda, mesmo fora da câmera |
@@ -48,11 +48,18 @@ Tags L0 fixas: terreno=1, colocação de plantas=2, clima=3, colocação de anim
 
 ### Topografia e habitats
 
-Para coordenadas inteiras `x,y∈{0,…,63}`, ponto central `c=31.5` e perturbação estável `ε(x,y)∈[−2,2] m` derivada de `ε=4u−2`, com `tag=terreno`, `subjectId=y×64+x`, `targetId=0`, `tick=0`, `drawIndex=0`:
+O relevo v10 conserva o campo determinístico v9: base de 62 m, ruído em três escalas (amplitudes de 15, 8 e 2.8 m), uma baixada sinuosa larga e duas cordilheiras curvas que a acompanham por lados opostos. Cada cadeia usa ombros gaussianos de 4.0–5.6 células e uma crista estreita; uma máscara espacial segmenta os maciços e produz selas. As amplitudes são 100–114 m na cadeia principal e 78–88 m na secundária. A baixada reduz em 82% o ruído local, desce 0.42 m por célula no eixo norte-sul e recebe depressões gaussianas de 22 m (largura 13.5 células) e 8 m (largura 2.6 células). Pequenas cristas de 5/4 m quebram as transições. A seed usa tags distintas por escala/feição; a Geosfera calcula o campo nas 64 × 64 células. A malha gráfica é uma subdivisão do snapshot e não altera a resolução física. O planalto usa o contorno `r(θ)=1+0.12 sin(3θ+φ)+0.065 sin(5θ−0.63φ)+0.035 sin(7θ+0.41φ)+0.02 sin(11θ−0.27φ)`, onde `φ` é derivada da seed; sua extensão foi reduzida para formar um afloramento menor. Dentro do contorno, a altitude é o topo plano; fora dele, continua o campo de base. O topo parte de 94–102 m e sobe quando necessário para manter pelo menos 18 m acima do ponto mais alto do terreno-base amostrado no contorno, limitado a 190 m. O desnível segue consultado pelo campo físico e pela drenagem. Células com `z < 75 m` usam perfil de solo *loam*; as demais, *sandy*. Encostas mais íngremes expõem uma faixa maior da textura rochosa.
+O relevo v10 conserva o campo determinístico v9: base de 62 m, ruído em três escalas (amplitudes de 15, 8 e 2.8 m), uma baixada sinuosa larga e duas cordilheiras curvas que a acompanham por lados opostos. Cada cadeia usa ombros gaussianos de 4.0–5.6 células e uma crista estreita; uma máscara espacial segmenta os maciços e produz selas. As amplitudes são 100–114 m na cadeia principal e 78–88 m na secundária. A baixada reduz em 82% o ruído local, desce 0.42 m por célula no eixo norte-sul e recebe depressões gaussianas de 22 m (largura 13.5 células) e 8 m (largura 2.6 células). Pequenas cristas de 5/4 m quebram as transições. A seed usa tags distintas por escala/feição; a Geosfera calcula o campo nas 64 × 64 células. A malha gráfica é uma subdivisão do snapshot e não altera a resolução física. O planalto usa o contorno `r(θ)=1+0.12 sin(3θ+φ)+0.065 sin(5θ−0.63φ)+0.035 sin(7θ+0.41φ)+0.02 sin(11θ−0.27φ)`, onde `φ` é derivada da seed; sua extensão foi reduzida para formar um afloramento menor. Dentro do contorno, a altitude é o topo plano; fora dele, continua o campo de base. O topo parte de 94–102 m e sobe quando necessário para manter pelo menos 18 m acima do ponto mais alto do terreno-base amostrado no contorno, limitado a 190 m. O desnível segue consultado pelo campo físico e pela drenagem. Células com `z < 75 m` usam perfil de solo *loam*; as demais, *sandy*. Encostas mais íngremes expõem uma faixa maior da textura rochosa.
 
-`z(x,y) = 25 + 0.06 × ((x−c)²+(y−c)²) + ε(x,y)` metros.
+O cenário v11 reduz o afloramento para raios de 2.9–3.8 células no eixo leste-oeste e 1.9–2.6 no eixo norte-sul. Para quebrar a silhueta elíptica, o contorno mantém as quatro harmônicas anteriores, adiciona componentes menores de frequência 13 e 19 e ruído de valor coerente com espaçamento de 2 células. A seed determina o detalhe; o topo segue plano e o paredão continua integrado ao campo-base e ao cálculo de drenagem.
 
-É uma depressão central em relevo estático, com bordas hidrológicas abertas conforme a regra de escoamento, com diferença de altitude aproximada de 120 m e perturbação determinística. Células com `z < 75 m` usam perfil de solo *loam*; as demais, *sandy*. Colocar gramínea em 55% das células baixas e 30% das altas; colocar grupo lenhoso em 8% das baixas e 20% das altas. Para cada perfil usar `u01(seed,2,y×64+x,profileId,0,0)` (`profileId=1` gramínea, `2` lenhoso); criar patch somente se `u<p`, com `p=0.55`/`0.30` para gramínea e `0.08`/`0.20` para lenhoso em célula baixa/alta. Se criado, iniciar `B=B0`, `Nplant=qN×B0`, `Z=NZ=0`. As proporções servem para produzir dois habitats contrastantes e são heurísticas.
+O cenário v12 conserva o afloramento principal e acrescenta dois menores sobre as cadeias montanhosas, um a oeste e outro a leste. Os centros, raios e alturas são derivados da seed; seus raios nominais ficam entre 1.05 e 1.70 células. Cada topo permanece plano e tem ao menos 18 m de elevação física sobre o ponto mais alto do terreno-base no contorno. A Hydrosphere calcula a drenagem a partir do campo combinado, e o cliente desenha as três faces em buffers compartilhados.
+
+O cenário v13 aumenta a ocupação lenhosa para 30% dos candidatos abaixo de 75 m, 62% na faixa de 75–125 m e 40% acima de 125 m (antes: 27%/40%/12%). O limite de inclinação sobe de 0.70 para 1.0 m/m para incluir os ombros das cordilheiras; células com água superficial continuam excluídas. A seleção espacial mantém manchas determinísticas por seed e deixa faces íngremes expostas.
+
+A ocupação vegetal inicial usa três faixas (<75 m, 75–125 m e ≥125 m) e exclui encostas acima do limite do grupo: gramíneas usam frações de 55%/38%/12%, inclinação máxima 1.0 m/m e água superficial até 150 mm; lenhosas usam 27%/40%/12%, inclinação máxima 0.70 m/m e apenas células secas. Os valores são parâmetros heurísticos para formar prados, florestas de altitude média e cumes mais expostos. Para `profileId=1` (gramínea), calcular `score=0.58 n10+0.27 n4+0.15 u`, usando espaçamentos 10 e 4 células; para `profileId=2` (lenhosa), `score=0.52 n12+0.32 n4+0.16 u`, usando espaçamentos 12 e 4 células. `n12`, `n4`, `n10` e `u` são valores `SpatialUnit`/`u01` derivados da seed; `SpatialUnit` interpola suavemente valores de uma grade de espaçamento indicado. Em cada faixa, ordenar pelo score decrescente e pelo índice da célula crescente para desempate; selecionar exatamente `round(N×p)` células elegíveis. Isso preserva a fração por habitat e forma manchas reprodutíveis. Patches criados começam com `B=B0`, `Nplant=qN×B0`, `Z=NZ=0`; os parâmetros de biomassa permanecem inalterados.
+
+No estado inicial, a Hydrosphere escolhe a descida D8 mais íngreme entre vizinhos, acumula células contribuintes em ordem altimétrica e armazena água nas células de canal e em até três depressões fechadas de maior contribuição. A borda da grade é saída aberta, não lago. Esse estoque de água faz parte do inventário em `tick=0`; ainda não há recarga perene de aquíferos nem erosão de leito.
 
 Animais recebem posições iniciais válidas em `[0,640) m` por coordenada, com `tag=colocação de animais`, `subjectId=EntityId`, `targetId=0`, `tick=0`, `drawIndex=0` (leste) e `1` (norte). Idade inicial é igual à maturidade e cooldown é zero; IDs começam em 1: herbívoros 1–40, predadores 41–44; novos IDs seguem em ordem crescente e tentativas diárias usam ordem de ID. Não gerar organismos para repor mortes.
 
@@ -114,12 +121,12 @@ P = min(12 mm, −1.5 mm × ln(1−u1)), se u0 < pwet
 
 Estoques hídricos usam milímetros por célula; fluxos são acumulados no intervalo. `1 mm × 1 m² = 1 L`; portanto, `1 mm × 100 m² = 100 L` nesta grade. Tabela de parâmetros:
 
-| Perfil | `Smax` (mm) | `Swilt` (mm) | `S0` (mm) | `W0` (mm) | `Ksat` (mm/h) |
+| Perfil | `Smax` (mm) | `Swilt` (mm) | `S0` (mm) | `Ksat` (mm/h) |
 |---|---:|---:|---:|---:|
-| *sandy* | 100 | 20 | 55 | 0 | 20 |
-| *loam* | 180 | 35 | 90 | 0 | 10 |
+| *sandy* | 100 | 20 | 55 | 20 |
+| *loam* | 180 | 35 | 90 | 10 |
 
-`S` é água no solo, `W` água superficial e `P` chuva; `S0` e `W0` são os estoques no início do cenário. Cobertura de dossel `Cplant` vem dos patches; interceptação instantânea L0, sem estoque de água na copa:
+`S` é água no solo, `W` água superficial e `P` chuva. `S0` é a água inicial do perfil; `W` e o estoque subterrâneo `G` começam com a drenagem derivada da seed. Células de canal (`F≥12`, onde `F` é a área contribuinte em células) recebem `G0=2600 mm`; esse estoque e a água superficial entram no inventário em `tick=0`, sem serem recriados como fluxo. Cobertura de dossel `Cplant` vem dos patches; interceptação instantânea L0, sem estoque de água na copa:
 
 ```
 Pint = 0.15 × Cplant × P                         # evaporação na fronteira
@@ -151,13 +158,13 @@ Dplant,total = ET0hour × qplant
 
 Após infiltração, `Sbefore` é o solo no início da partição evaporativa. Calcular `Esoil` e então `Savailable=pos(Sbefore−Esoil−Swilt)`. Para perfis vegetais `i`, `Dwater_i=ET0hour×q_i`; se `ΣDwater=0` na célula, conceder zero; caso contrário `grant_i=Dwater_i×min(1,Savailable/ΣDwater)` para todos os perfis daquela célula. Aplicar o débito total uma vez. `fgrantWater_i=1` se `Dwater_i=0`, senão `min(1,grant_i/Dwater_i)`. Calcular `favailable=clip(Savailable/(0.25×(Smax−Swilt)),0,1)` e `fW_i=min(favailable,fgrantWater_i)`. À noite `ET0hour=0`, logo não há transpiração nem fotossíntese.
 
-Escoamento superficial é difusão conservativa em vizinhança D8. `dx=10 m`, `Dsurf=2 m²/h`, `a=min(0.02,Dsurf Δh/dx²)` (L0: `a=0.02`) e `H_i=z_i+W_i/1000` em metros. Para cada par não ordenado de células vizinhas, a proposta de lâmina em direção à célula de menor carga é:
+Escoamento superficial é difusão conservativa em vizinhança D8; a direção de drenagem inicial é uma feição geográfica separada que orienta onde `W` é semeado. Em cada hora, cada célula de canal libera água subterrânea como fluxo de base: `qbase=min(G, 0.30 + 0.08×log2(F/12)) mm/h`, com `G-=qbase` e `W+=qbase`. Essa reserva é finita e não recebe recarga neste L0. `dx=10 m`, `Dsurf=2 m²/h`, `a=min(0.02,Dsurf Δh/dx²)` (L0: `a=0.02`) e `H_i=z_i+W_i/1000` em metros. Para cada par não ordenado de células vizinhas, a proposta de lâmina em direção à célula de menor carga é:
 
 `qij = a × 1000 × max(0, H_i−H_j) mm por intervalo de 1 h`.
 
-Converter `qij` em volume multiplicando pela área da célula. Calcular todos os fluxos do mesmo snapshot; se a soma de saídas propostas exceder `W_i`, escalá-las proporcionalmente até `W_i`. Para cada direção D8 ausente na borda, usar célula fantasma com `W=0` e elevação igual à célula de borda, propondo saída `a×W_i` mm/h naquela direção; escalar em conjunto com as demais saídas. Aplicar débitos/créditos simultaneamente. Água que cruza a borda é saída de fronteira; depressões retêm água. Não há rios permanentes em canal, aquífero, percolação profunda ou retorno de água subterrânea no L0.
+Converter `qij` em volume multiplicando pela área da célula. Calcular todos os fluxos do mesmo snapshot; se a soma de saídas propostas exceder `W_i`, escalá-las proporcionalmente até `W_i`. Para cada direção D8 ausente na borda, usar célula fantasma com `W=0` e elevação igual à célula de borda, propondo saída `a×W_i` mm/h naquela direção; escalar em conjunto com as demais saídas. Aplicar débitos/créditos simultaneamente. Água que cruza a borda é saída de fronteira; depressões retêm água. O armazenamento inicial em canais é finito e pode secar; não há vazão de base, aquífero, percolação profunda ou retorno de água subterrânea no L0.
 
-**Balanço da água:** `Δ(surface + soil + água corporal animal) = chuva − interceptação − evaporação superficial − evaporação do solo − transpiração − saída na borda − excreção animal`; escoamento entre células e bebida `surface→animal` cancelam no total. Água corporal vegetal não é estoque persistente.
+**Balanço da água:** `Δ(surface + groundwater + soil + água corporal animal) = chuva − interceptação − evaporação superficial − evaporação do solo − transpiração − saída na borda − excreção animal`; fluxo de base `groundwater→surface`, escoamento entre células e bebida `surface→animal` cancelam no total. Água corporal vegetal não é estoque persistente.
 
 ## Vegetação
 
@@ -311,7 +318,7 @@ Os limites de 40 herbívoros e 4 predadores são condição do cenário e da med
 
 ## Metas de desempenho para N0–N4
 
-Referência de medição disponível neste ambiente em 21/10/2026: Windows 11 Pro, Intel Core i3-10105 (4 núcleos/8 threads), 16 GiB RAM, NVIDIA GeForce RTX 5060. Registrar versão do SDK/runtime, build Release, hash, resolução, drivers, hardware, seed e configuração em cada medição; os valores abaixo são metas, **não resultados medidos**. Medir headless em CPU, sem log por evento/tick; medir desktop em 1280×720 com mapa 64×64 e camadas de inspeção.
+Referência de medição disponível neste ambiente em 21/10/2026: Windows 11 Pro, Intel Core i3-10105 (4 núcleos/8 threads), 16 GiB RAM, NVIDIA GeForce RTX 5060. Registrar versão do SDK/runtime, build Release, hash, resolução, drivers, hardware, seed e configuração em cada medição; os valores da tabela abaixo são metas. Medir headless em CPU, sem log por evento/tick; medir desktop em 1280×720 com mapa 64×64 e camadas de inspeção.
 
 | Marco | Meta objetiva |
 |---|---|
@@ -322,7 +329,74 @@ Referência de medição disponível neste ambiente em 21/10/2026: Windows 11 Pr
 | Persistência | salvar e carregar/validar estado integrado da seed 1 no dia 365 em ≤2 s cada; save do dia 365 ≤10 MiB, excluindo cache recriável de imagem |
 | Integridade | nenhuma perda de tick/evento após pause/resume/save; carga não muda o hash canônico da continuação |
 
-A meta principal mede a seed canônica 1 com reprodução ativa a partir dos 44 animais iniciais; a população pode variar e não existe teto oculto. Fazer uma execução de aquecimento separada, reiniciar do estado inicial antes de cada uma das três medições e registrar contagem máxima. Usar seeds 1–3 para o gate ecológico; uma fixture fixa de 44 sem reprodução serve apenas para diagnosticar custo. Medir Release quente e frio quando houver runtime; a meta de throughput usa execução quente e relata ambos. Sem cumprir o alvo, localizar primeiro a fase/processo pelo perfilador; não reduzir quantidade de células, agentes ou testes silenciosamente. Ajustar a meta apenas com registro de mudança, causa e cenário preservado.
+### Medição desktop N4 — cenário v4
+
+Executada em Release com SDK .NET 10.0.400, Windows 11 Pro, Intel Core i3-10105, 16 GiB RAM e NVIDIA GeForce RTX 5060 (driver 32.0.16.1088). Seed 1, 64 × 64 células, 1280 × 720, água e câmera fixa ativas; aquecimento de 5 s separado da janela medida de 60 s. Resultado: 3.590 quadros, média de 59.83 FPS, P95 de 17.12 ms, P99 de 25.90 ms, CPU de 60.6% de um núcleo e working set de 154.6 MiB. A amostra cumpre as metas N4 e memória desktop; os 17 testes passaram em Release. SHA256 do assembly `Game.Client.Desktop.dll`: `F13CDD30F7D49C719231027530F8F5CDDC41915DACA3784DCB16EFEBEFAFA6AA`. O modo reproduzível do cliente é `Game.Client.Desktop.exe --benchmark-seconds 60`; ele mede 1280 × 720 automaticamente e imprime os percentis após o aquecimento. O resultado bruto foi guardado fora do repositório em `genesis-render-benchmark-v4-chunked-release.txt`.
+
+### Medição desktop — cenário v5
+
+Executada em Release no mesmo hardware e driver acima, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica alinhada ao eixo do vale; aquecimento de 5 s e medição contínua de 60 s. Resultado: 3.590 quadros, média de 59.83 FPS, P95 de 20.31 ms, P99 de 30.11 ms, CPU de 61.0% de um núcleo e working set de 145.0 MiB. A amostra cumpre as metas N4; os 17 testes passaram em Release. SHA256 do assembly `Game.Client.Desktop.dll`: `BBA288B77F9A0FFF20DCDF139FE053AE3287BE1DCDD941E780788B9561C165C3`. Resultado bruto: `genesis-render-benchmark-v5-final-release.txt`.
+
+### Medição desktop — cenário v6
+
+Executada em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica alinhada ao eixo do vale; aquecimento de 5 s e medição contínua de 60 s. Resultado: 3.588 quadros, média de 59.78 FPS, P95 de 18.08 ms, P99 de 30.18 ms, CPU de 66.8% de um núcleo e working set de 139.6 MiB. A amostra cumpre as metas N4; os 17 testes passaram em Release. SHA256 do assembly `Game.Client.Desktop.dll`: `06F9917E7EDFEE3CBBAFCBF9090B2454B1530DEA797AEAE5D026FBFAC2B9F457`. Resultado bruto: `genesis-render-benchmark-v6-release.txt`.
+
+### Medição desktop — cenário v7
+
+Executada em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e janela contínua de 60 s. Resultado: 3.576 quadros, média de 59.60 FPS, P95 de 22.06 ms, P99 de 36.85 ms, CPU de 65.0% de um núcleo e working set de 125.4 MiB. A amostra cumpre as metas N4 e memória desktop. Os 17 testes passaram em Release. SHA256 do assembly `Game.Client.Desktop.dll`: `11970169274F722D3B92859234233526E376C5B1A7AAEA5332BF6D71AF76ECE5`. Resultado bruto: `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v7-release.txt`.
+
+### Validação v8 — estado e medição desktop
+
+As seeds 1–3 foram avançadas em Release até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,0–155,9 m, 1031 células molhadas, 2572 grupos de gramínea e 1478 lenhosos, hash de estado `57F080F4922924A006C55E78AC70AB39089DFB24E4D7F0AE12062A97019DBEE9`. Seed 2: 19,4–154,5 m, 1143 células molhadas, 2826 gramíneas e 1519 lenhosos, hash `ECD411C3A43DF691183DCC6E51125CB35A3D350B4711DB85659958019B28B02B`. Seed 3: 17,8–148,0 m, 1032 células molhadas, 2895 gramíneas e 1627 lenhosos, hash `007E5ECE1BE23E351A6B2FB6B81C18378E32FEEC90F4DAA381861DD1B553F92B`. Os resíduos máximos absolutos entre as três execuções foram `7.678×10⁻⁷ L` de água, `4.370×10⁻⁶ g` de matéria seca e `2.421×10⁻⁸ gN`; os testes Release passaram (17/17).
+
+Em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição contínua de 60 s. Resultado: 3586 quadros, média de 59.77 FPS, P95 de 17.21 ms, P99 de 37.31 ms, CPU de 38.3% de um núcleo e working set de 136.9 MiB. A amostra cumpre as metas N4 e memória desktop. SHA256 do assembly `Game.Client.Desktop.dll`: `98D17FB4E860557A1963DFFDE4BE3D8FDF9F35A28ED7131E503903BAAAF17861`. Resultado bruto: `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v8-release.txt`.
+
+### Validação v9 — terreno, estado e renderização
+
+As seeds 1–3 avançaram até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,0–170,1 m, 1068 células com água, 2564 grupos de gramínea e 1417 lenhosos; hash `91BD70CCAF2F97C19BD0711BAD4EFA060FE4AA09B8C0941C97F59AF33DA90B11`. Seed 2: 19,4–168,7 m, 1165 células com água, 2706 gramíneas e 1406 lenhosos; hash `2AD2345DAA40A61A43A00DCE2BDAB28D06C500F2B8D06DF0B7BF0F21A7F888D3`. Seed 3: 17,8–162,6 m, 1071 células com água, 2819 gramíneas e 1479 lenhosos; hash `78A4DCCB09A276B69BEF0A7D34020FC583EAB83F6402B73EFD118AE1E4CFF746`. Resíduos máximos absolutos: `1.089×10⁻⁶ L` de água, `6.048×10⁻⁶ g` de matéria seca e `5.588×10⁻⁹ gN`. Os testes passaram (17/17).
+
+Em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e janela contínua de 60 s. Resultado: 3586 quadros, média de 59.77 FPS, P95 de 17.23 ms, P99 de 39.43 ms, CPU de 40.4% de um núcleo e working set de 132.5 MiB. Cumpre as metas N4 e memória desktop. SHA256 do assembly `Game.Client.Desktop.dll`: `E46E814694CE783C83FD7E645520329B65C37BED6962B7054F4AC6A25ECFE4EB`. Captura `genesis-flora-v9b.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v9-release.txt`.
+
+### Validação v10 — cobertura lenhosa e estado
+
+As seeds 1–3 avançaram até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,0–170,1 m, 1068 células com água, 2564 grupos de gramínea e 1473 lenhosos; hash `5126DD120DBB423F14672F4B74F89FE176793C5AD7405BD1236C52164CD80800`. Seed 2: 19,4–168,7 m, 1166 células com água, 2706 gramíneas e 1442 lenhosos; hash `C1E329FEC3C1938300241061DCFFCE697E849FCDC067FFAF8B46AAE18539989D`. Seed 3: 17,8–162,6 m, 1070 células com água, 2819 gramíneas e 1611 lenhosos; hash `CC73B7CCA43C6EF8DE17E254ABB473609AF483D5B2C9654E289CEE94580DFC89`. Resíduos máximos absolutos: `1.333×10⁻⁶ L` de água, `5.521×10⁻⁶ g` de matéria seca e `2.049×10⁻⁸ gN`. Os testes passaram (17/17).
+
+Em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e janela contínua de 60 s. Resultado: 3586 quadros, média de 59.77 FPS, P95 de 17.18 ms, P99 de 38.57 ms, CPU de 43.0% de um núcleo e working set de 155.9 MiB. Cumpre as metas N4 e memória desktop. SHA256 do assembly `Game.Client.Desktop.dll`: `1002B4932BA454D064442B1EF6F656CDE0A68006DF6D3FF3E2E6F7B0E744B1FA`. Captura `genesis-flora-v10.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v10-release.txt`.
+
+### Refinamento visual da água — renderizador v11
+
+Sem alterar a seed nem o estado ecológico v10, a margem da água passou a usar ruído coerente em três escalas, e as fitas dos rios ganharam largura assimétrica determinística. O cliente pré-amostra esses campos e reutiliza vértices nas triangulações. Em Release, na mesma máquina e configuração, a medição de 60 s após 5 s de aquecimento obteve 3585 quadros, média de 59.75 FPS, P95 de 17.07 ms, P99 de 40.68 ms, CPU de 46.2% de um núcleo e working set de 203.7 MiB. Cumpre N4 e memória desktop. SHA256 do assembly `Game.Client.Desktop.dll`: `C8846BE150BB7948474D071B2C22FBEB4BF26B1D05C0E369140EF37ABF0E073D`. Captura `genesis-flora-v11-final.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v11-optimized-release.txt`. Os 17 testes passaram em Release.
+
+### Autotile de grama — renderizador v12
+
+O cliente cria uma máscara visual 4 × 4 por célula a partir de biomassa viva, com ruído determinístico em escalas de uma e quatro células; a vizinhança diagonal recorta os cantos dos pequenos agrupamentos. O estado ecológico permanece v10. Na medição Release de 60 s, após 5 s de aquecimento, houve 3584 quadros, média de 59.73 FPS, P95 de 17.09 ms, P99 de 41.40 ms, CPU de 50.3% de um núcleo e working set de 203.5 MiB. Cumpre N4 e memória desktop. Os 18 testes passaram, incluindo repetibilidade da máscara, conexões de vizinhança e ausência de cobertura em células sem biomassa. SHA256 de `Game.Client.Desktop.dll`: `AD57D560C4209D50062DAF6C44BD7118827810E874FDEA7F0DD253F219570D3F`. Captura `genesis-flora-v12-grass-autotile.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v12-grass-autotile.txt`.
+
+### Geografia v11 e renderização v13
+
+As seeds 1–3 avançaram até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,0–170,1 m, 1073 células molhadas, 2555 grupos de gramínea e 1459 lenhosos; hash `475040802B1B82B62F1139FEA474B286D2D6537899A6061386E682C6D80D1D56`. Seed 2: 19,4–168,7 m, 1180 células molhadas, 2679 gramíneas e 1448 lenhosos; hash `8021EF4A56BC8DE8C5F4F348A3D06BD8AD16133ABD5D0CED0C1CB577968394BC`. Seed 3: 17,8–162,6 m, 1076 células molhadas, 2824 gramíneas e 1612 lenhosos; hash `1FA3EF74F1D52DC0A201314B6DBE33DD0DDBA95896CBB03C3208CD157E6D3A54`. O maior resíduo entre as seeds foi `1.403×10⁻⁶ L` de água, `5.226×10⁻⁶ g` de matéria seca e `2.421×10⁻⁸ gN`. A suíte Release passou (18/18).
+
+Em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição de 60 s. Resultado: 3576 quadros, média de 59.60 FPS, P95 de 17.45 ms, P99 de 42.06 ms, CPU de 45.7% de um núcleo e working set de 204.8 MiB. A amostra atende às metas desktop N4. SHA256 de `Game.Client.Desktop.dll`: `AD57D560C4209D50062DAF6C44BD7118827810E874FDEA7F0DD253F219570D3F`; SHA256 de `Game.Modules.Geosphere.dll`: `6FC4F03ACB82EDEF2EB7CDA88ADD42E92CC6E2BB8AD349CFBD2340F850DFA23D`. Captura `genesis-flora-v13-weathered-outcrop.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v13-release.txt`.
+
+### Geografia v12 e renderização v14
+
+As seeds 1–3 avançaram até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,0–170,1 m, 1077 células molhadas, 2548 grupos de gramínea e 1463 lenhosos; hash `0E1FC3788328EA57A361760B9625A106EC4EE2FBD0407A9B413AAF40CAA87D42`. Seed 2: 19,4–168,7 m, 1189 células molhadas, 2672 gramíneas e 1447 lenhosos; hash `CA9B96C933F65165D7FB8FC0DD9DFF7CD012164CC399C2BD78A6B3D8A49C531A`. Seed 3: 17,8–162,6 m, 1078 células molhadas, 2811 gramíneas e 1594 lenhosos; hash `F52CD952C2CED6A77AD3B802E7BE2A3A946A3AF875FA8ACEBC379EC83AD91E4F`. O maior resíduo entre as seeds foi `1.317×10⁻⁶ L` de água, `4.998×10⁻⁶ g` de matéria seca e `2.235×10⁻⁸ gN`. A suíte Release passou (19/19).
+
+Em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição de 60 s. Resultado: 3539 quadros, média de 58.98 FPS, P95 de 17.10 ms, P99 de 47.02 ms, CPU de 44.5% de um núcleo e working set de 160.6 MiB. A amostra atende às metas desktop N4. SHA256 de `Game.Client.Desktop.dll`: `00B8AFAFC408FA7D68B3860AF90F10ACB703641E4F89063FA8224911CC9B7384`; SHA256 de `Game.Modules.Geosphere.dll`: `CD10175423D0C6BB29A4F0F0AA981EB269FB7A18BC17D28D7EAE14060FA1FAB4`. Captura `genesis-flora-v14-multiple-outcrops.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v14-release.txt`.
+### Bosques por patch agregado — renderizador v15
+
+Cada patch lenhoso desenha de 2 a 5 copas, com tamanho e posições reprodutíveis derivados da biomassa, da célula e da seed. É uma representação visual do patch agregado, sem novos organismos ou mudanças no estado ecológico v12. Os 19 testes Release passaram.
+
+Em Release no mesmo hardware e driver, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição de 60 s. Resultado: 3560 quadros, média de 59.33 FPS, P95 de 17.08 ms, P99 de 45.43 ms, CPU de 48.2% de um núcleo e working set de 160.6 MiB. A amostra atende às metas desktop N4. SHA256 de `Game.Client.Desktop.dll`: `972B4E56B3A28F982BB530F2F7FE04BCC4E30D6E1D5E307AE8B4D795C33FBAA4`. Captura `genesis-flora-v15-canopy-groves.png`; resultado bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v15-canopy-groves.txt`.
+
+### Bosques de altitude — cenário ecológico v13 / revisão visual v17
+
+A cobertura lenhosa inicial usa frações de 30%/62%/40% nas faixas abaixo de 75 m, de 75–125 m e acima de 125 m. A inclinação máxima para gramíneas e lenhosas é 1.0 m/m; árvores continuam excluídas de células com água superficial, e gramíneas toleram até 150 mm. A seleção é determinística e espacialmente agrupada, preservando faces mais íngremes expostas.
+
+As seeds 1–3 avançaram até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,0–170,1 m, 1077 células molhadas, 2548 grupos de gramínea e 1892 lenhosos; hash `06E7C2C89966DF0B928FA90E536B8A9F879B6AA7E1FB0D398240D8299FB4F6E3`. Seed 2: 19,4–168,7 m, 1190 células molhadas, 2672 gramíneas e 2114 lenhosos; hash `8B76E90299471253793E753677C2D3B8A0EA865DECD65F0BB8AA5B25F9F4B06F`. Seed 3: 17,8–162,6 m, 1078 células molhadas, 2811 gramíneas e 2045 lenhosos; hash `1B971F055A251037A6118BDAE812244FB82020F63F54D5B9B0273047BC530CBB`. Resíduos máximos absolutos: `1.471×10⁻⁶ L` de água, `4.498×10⁻⁶ g` de matéria seca e `2.980×10⁻⁸ gN`. A suíte Release passou (19/19).
+
+Em Release, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição de 60 s. Resultado: 3541 quadros, média de 59.02 FPS, P95 de 17.20 ms, P99 de 45.80 ms, CPU de 58.2% de um núcleo e working set de 181.5 MiB. O cliente manteve aproximadamente 59 FPS; o custo de memória aumentou com os bosques mais densos. SHA256 de `Game.Client.Desktop.dll`: `D2C2F4B64D3F98683A307BB9820683E9F19F42D338C17BD081A28DA5379442F3`. A captura `genesis-flora-v17-highland-forest.png` ainda mostra encostas abertas e rios mais largos que a referência. Resultado bruto: `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v17-highland-forest.txt`.
+
+O benchmark de apresentação v17 mede a seed canônica 1 sem fauna, com simulação a 6 ticks/s; essa build termina na flora. Cenários de custo com 44 animais e os gates N3 são especificação futura e não foram executados nesta branch. Usar seeds 1–3 para o gate ecológico N0–N2; cada medição de renderer começa do mesmo estado inicial. Quando fauna entrar no runtime, registrar separadamente população máxima e custo por fase. Sem cumprir uma meta, localizar primeiro a fase/processo pelo perfilador; não reduzir quantidade de células ou testes silenciosamente. Ajustar metas apenas com registro de mudança, causa e cenário preservado.
 
 ## Limites que os primeiros experimentos devem avaliar
 

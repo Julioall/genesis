@@ -17,13 +17,14 @@ dotnet run --project src/Game.App/Game.App.csproj -c Release -- --load world.jso
 dotnet run --project src/Game.Client.Desktop/Game.Client.Desktop.csproj -c Release
 ```
 
-O runner usa `temperate-valley-l0-v2`, seed 1 por padrão e ticks de 10 minutos. A janela começa a 6 ticks simulados por segundo. Teclas `1/2/3` alternam o fundo entre relevo, água do solo e biomassa; `Space` pausa; `+/-` muda a velocidade; `F5/F9` salva/carrega em `%LOCALAPPDATA%/Game/natural-world-save.json`. Passe o mouse sobre uma célula para inspecionar seus campos.
+O runner usa `temperate-valley-l0-v13`, seed 1 por padrão e ticks de 10 minutos. A janela começa a 6 ticks simulados por segundo. Teclas `1/2/3` alternam o fundo entre relevo, água do solo e biomassa; `Space` pausa; `+/-` muda a velocidade; `F5/F9` salva/carrega em `%LOCALAPPDATA%/Game/natural-world-save.json`. Passe o mouse sobre uma célula para inspecionar seus campos.
 
 ## O que está implementado
 
 - Geração determinística 64×64 por seed, calendário, geometria solar, temperatura, chuva por zona, relevo, perfis de solo, infiltração, água superficial, evaporação, escoamento de borda e respectivos fluxos de água.
 - Gramíneas e plantas lenhosas por patch/célula, crescimento horário condicionado a PAR, água e N, banco/dispersão/germinação de sementes, senescência, detritos e mineralização/decomposição diária.
 - Livro agregado para água, matéria seca equivalente e N; snapshots de leitura para a apresentação; save/load JSON com validação básica e continuação determinística.
+- Malha 2.5D com altitude geométrica, chunks contínuos e afloramentos com paredes laterais; a cobertura vegetal e os rios continuam ligados ao snapshot físico.
 - Imagens procedurais em memória para terreno, pedras, gramíneas, troncos e folhas sazonais. A aparência usa uma seed visual separada e não altera a simulação. Nenhum pack de imagens é obrigatório.
 
 Os números e as simplificações são os parâmetros heurísticos L0 documentados; não representam calibração de campo. Consulte [equações, limites e metas](docs/20_L0_MODEL_AND_BENCHMARKS.md), [pesquisa e decisões visuais](docs/15_RESEARCH.md) e [roadmap](docs/12_ROADMAP.md).
@@ -31,6 +32,7 @@ Os números e as simplificações são os parâmetros heurísticos L0 documentad
 ## Estrutura e documentação
 
 - [Índice dos documentos](docs/README.md)
+- [Terreno geométrico 2.5D](docs/21_GEOMETRIC_TERRAIN.md)
 - [Arquitetura e marcos](docs/01_ARCHITECTURE.md) · [ADR-0001](docs/decisions/ADR-0001-Science-Is-Documentation.md) · [ADR-0002](docs/decisions/ADR-0002-L0-runtime-and-presentation.md)
 - [Síntese visual do Consensus](docs/research/consensus-procedural-flora.md)
 - [Plano de testes](docs/13_TESTS.md)

@@ -15,12 +15,12 @@ O contrato documental propõe uma implementação incremental em C#, com estado 
 - Gerar silhuetas e pixels por código em cache da sessão. Variações visuais são derivadas por uma função separada da seed ecológica. Sazonalidade de folhas é somente aparência; não representa estoque de folhas nem altera a simulação.
 - Rochas visuais são uma composição determinística baseada em elevação e variação visual; não representam estoque geológico L0, colisão nem recurso mineral.
 - Não incluir fauna, nem classes de fase futura. A documentação biológica permanece como intenção futura do roadmap.
-- Aplicar valores e unidades da ficha `temperate-valley-l0-v2` sem alterar seus parâmetros L0.
+- Aplicar valores e unidades da ficha versionada `temperate-valley-l0-v13`.
 
 ## Alternativas consideradas
 
 - Migrar para web/Phaser: descartado porque viola o stack explícito deste projeto.
-- Reutilizar ou extrair motores/PNGs de `Spectators-of-Life`: descartado nesta etapa. O checkout tem alterações locais amplas e a procedência/licença não está confirmada para todos os itens. A licença MIT visível em um subdiretório de vegetação não cobre automaticamente motores de rocha, ventos ou imagens.
+- Reutilizar motores ou PNGs de `Spectators-of-Life`: descartado nesta etapa porque o cliente foi solicitado sem dependência de pacotes de arte; algoritmos de suavização visual podem ser adaptados sem introduzir o runtime do projeto de referência.
 - Renderer com folhas/galhos como entidades persistentes: descartado; acrescentaria estado sem uso na simulação L0 e contrariaria a representação agregada por patch.
 
 ## Consequências e evidência

@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\src\Game.Modules.Hydrosphere\Game.Modules.Hydrosphere.csproj" />
     <ProjectReference Include="..\..\src\Game.Modules.Biosphere\Game.Modules.Biosphere.csproj" />
     <ProjectReference Include="..\..\src\Game.Procedural\Game.Procedural.csproj" />
+    <ProjectReference Include="..\..\src\Game.Client.Desktop\Game.Client.Desktop.csproj" />
   </ItemGroup>
 
 </Project>

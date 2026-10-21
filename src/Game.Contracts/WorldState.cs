@@ -31,6 +31,7 @@ public readonly record struct WorldCell(
     double SoilWiltMm,
     double SoilKsatMmPerHour,
     double SurfaceWaterMm,
+    double GroundwaterMm,
     double MineralNitrogenGPerM2,
     double SoilOrganicMatterGPerM2,
     double SoilOrganicNitrogenGPerM2,

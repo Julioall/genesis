@@ -45,7 +45,7 @@ public sealed class WorldSimulation
         var nitrogen = 0.0;
         foreach (var cell in _state.Cells)
         {
-            water += (cell.SoilWaterMm + cell.SurfaceWaterMm) * SimulationState.CellAreaM2;
+            water += (cell.SoilWaterMm + cell.SurfaceWaterMm + cell.GroundwaterMm) * SimulationState.CellAreaM2;
             dry += (cell.Grass.BiomassGPerM2 + cell.Grass.SeedBankGPerM2
                 + cell.Woody.BiomassGPerM2 + cell.Woody.SeedBankGPerM2
                 + cell.DetritusDryGPerM2 + cell.SoilOrganicMatterGPerM2) * SimulationState.CellAreaM2;
@@ -183,25 +183,31 @@ public sealed class WorldSimulation
     private static SimulationState CreateInitialState(ulong seed)
     {
         var cells = new WorldCell[SimulationState.Width * SimulationState.Height];
+        var elevationField = TerrainModel.GenerateElevationField(seed);
+        var emptyPatch = new PlantPatch(false, 0, 0, 0, 0, 0, 0);
         for (var y = 0; y < SimulationState.Height; y++)
         for (var x = 0; x < SimulationState.Width; x++)
         {
             var index = y * SimulationState.Width + x;
-            var elevation = TerrainModel.Elevation(x, y, seed);
+            var elevation = elevationField[index];
             var kind = elevation < 75 ? SoilKind.Loam : SoilKind.Sandy;
             var profile = SoilModel.Profile(kind);
-            var empty = new PlantPatch(false, 0, 0, 0, 0, 0, 0);
-            var low = elevation < 75;
-            var grassProbability = low ? 0.55 : 0.30;
-            var woodyProbability = low ? 0.08 : 0.20;
-            var grassPresent = CounterRandom.Unit(seed, CounterRandom.PlantPlacementTag, (ulong)index, 1, 0, 0) < grassProbability;
-            var woodyPresent = CounterRandom.Unit(seed, CounterRandom.PlantPlacementTag, (ulong)index, 2, 0, 0) < woodyProbability;
-            var grass = grassPresent ? new PlantPatch(true, 100, 1.8, 0, 0, 0, 0) : empty;
-            var woody = woodyPresent ? new PlantPatch(true, 250, 3.0, 0, 0, 0, 0) : empty;
             cells[index] = new WorldCell(index, x, y, elevation, kind,
                 profile.InitialWaterMm, profile.CapacityMm, profile.WiltMm, profile.KsatMmPerHour,
-                0, profile.InitialN, profile.InitialSom, profile.InitialSomN, grass, woody,
+                0, 0, profile.InitialN, profile.InitialSom, profile.InitialSomN, emptyPatch, emptyPatch,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, new ClimateSample(0, 0, 0, 0, 0));
+        }
+        cells = SurfaceWaterModel.SeedInitialWater(cells);
+        var initialSurfaceWater = cells.Select(cell => cell.SurfaceWaterMm).ToArray();
+        var grassPresence = CreateClusteredPlantPlacements(seed, elevationField, initialSurfaceWater, 1,
+            [0.55, 0.38, 0.12], 1.0, 150);
+        var woodyPresence = CreateClusteredPlantPlacements(seed, elevationField, initialSurfaceWater, 2,
+            [0.30, 0.62, 0.40], 1.0, 0);
+        for (var index = 0; index < cells.Length; index++)
+        {
+            var grass = grassPresence[index] ? new PlantPatch(true, 100, 1.8, 0, 0, 0, 0) : emptyPatch;
+            var woody = woodyPresence[index] ? new PlantPatch(true, 250, 3.0, 0, 0, 0, 0) : emptyPatch;
+            cells[index] = cells[index] with { Grass = grass, Woody = woody };
         }
 
         var initialDay = 1;
@@ -229,6 +235,52 @@ public sealed class WorldSimulation
         };
     }
 
+    private static bool[] CreateClusteredPlantPlacements(
+        ulong seed,
+        double[] elevations,
+        double[] surfaceWaterMm,
+        ulong profileId,
+        double[] elevationFractions,
+        double maximumSlope,
+        double maximumSurfaceWaterMm)
+    {
+        if (elevationFractions.Length != 3 || elevationFractions.Any(fraction => fraction is < 0 or > 1))
+            throw new ArgumentException("Plant placement needs lowland, upland, and alpine fractions.", nameof(elevationFractions));
+        if (surfaceWaterMm.Length != elevations.Length || !double.IsFinite(maximumSlope) || maximumSlope < 0
+            || !double.IsFinite(maximumSurfaceWaterMm) || maximumSurfaceWaterMm < 0)
+            throw new ArgumentException("Plant placement needs compatible water and terrain fields.", nameof(surfaceWaterMm));
+        var scores = new double[elevations.Length];
+        var candidates = new[] { new List<int>(), new List<int>(), new List<int>() };
+        for (var index = 0; index < elevations.Length; index++)
+        {
+            var x = index % SimulationState.Width;
+            var y = index / SimulationState.Width;
+            var broadSpacing = profileId == 2 ? 12 : 10;
+            var regionalSpacing = 4;
+            var broad = CounterRandom.SpatialUnit(seed, CounterRandom.PlantPlacementTag, x, y, broadSpacing, profileId, 1);
+            var regional = CounterRandom.SpatialUnit(seed, CounterRandom.PlantPlacementTag, x, y, regionalSpacing, profileId, 2);
+            var local = CounterRandom.Unit(seed, CounterRandom.PlantPlacementTag, (ulong)index, profileId, 0, 0);
+            scores[index] = profileId == 2
+                ? broad * 0.52 + regional * 0.32 + local * 0.16
+                : broad * 0.58 + regional * 0.27 + local * 0.15;
+            if (surfaceWaterMm[index] > maximumSurfaceWaterMm
+                || TerrainModel.SlopeMagnitude(elevations, x, y) > maximumSlope) continue;
+            var zone = elevations[index] < 75 ? 0 : elevations[index] < 125 ? 1 : 2;
+            candidates[zone].Add(index);
+        }
+
+        var present = new bool[elevations.Length];
+        for (var zone = 0; zone < candidates.Length; zone++) Select(candidates[zone], elevationFractions[zone]);
+        return present;
+
+        void Select(List<int> candidates, double fraction)
+        {
+            var targetCount = (int)Math.Round(candidates.Count * fraction, MidpointRounding.AwayFromZero);
+            foreach (var index in candidates.OrderByDescending(candidate => scores[candidate]).ThenBy(candidate => candidate).Take(targetCount))
+                present[index] = true;
+        }
+    }
+
     private static void Validate(SimulationState state)
     {
         if (state.SchemaVersion != 1) throw new InvalidDataException($"Unsupported save schema {state.SchemaVersion}.");
@@ -238,7 +290,7 @@ public sealed class WorldSimulation
             throw new InvalidDataException("Save has invalid world dimensions or scheduler state.");
         foreach (var cell in state.Cells)
         {
-            var values = new[] { cell.ElevationM, cell.SoilWaterMm, cell.SurfaceWaterMm, cell.MineralNitrogenGPerM2,
+            var values = new[] { cell.ElevationM, cell.SoilWaterMm, cell.SurfaceWaterMm, cell.GroundwaterMm, cell.MineralNitrogenGPerM2,
                 cell.SoilOrganicMatterGPerM2, cell.SoilOrganicNitrogenGPerM2, cell.DetritusDryGPerM2, cell.DetritusNitrogenGPerM2,
                 cell.Grass.BiomassGPerM2, cell.Grass.NitrogenGPerM2, cell.Grass.SeedBankGPerM2, cell.Grass.SeedBankNitrogenGPerM2,
                 cell.Woody.BiomassGPerM2, cell.Woody.NitrogenGPerM2, cell.Woody.SeedBankGPerM2, cell.Woody.SeedBankNitrogenGPerM2 };

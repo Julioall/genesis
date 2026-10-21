@@ -7,8 +7,14 @@ namespace Game.Client.Desktop;
 /// <summary>Builds a pixel-art surface from the authoritative L0 grid without changing it.</summary>
 internal static class PixelTerrainTexture
 {
+    private static readonly (int X, int Y)[] GrassNeighbors =
+    [
+        (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)
+    ];
+
     public static Color[] Generate(WorldSnapshot world, int pixelsPerCell, int overlayMode, Season visualSeason)
     {
+        if (pixelsPerCell < 1) throw new ArgumentOutOfRangeException(nameof(pixelsPerCell));
         var width = world.Width * pixelsPerCell;
         var height = world.Height * pixelsPerCell;
         var pixels = new Color[width * height];
@@ -16,7 +22,6 @@ internal static class PixelTerrainTexture
         var elevationGrid = new double[cellCount];
         var sandy = new double[cellCount];
         var grass = new double[cellCount];
-        var water = new double[cellCount];
         var soilWater = new double[cellCount];
         var soilCapacity = new double[cellCount];
         var nitrogen = new double[cellCount];
@@ -27,7 +32,6 @@ internal static class PixelTerrainTexture
             elevationGrid[i] = cell.ElevationM;
             sandy[i] = cell.SoilKind == SoilKind.Sandy ? 1 : 0;
             grass[i] = cell.Grass.Present ? Math.Clamp(1 - Math.Exp(-cell.Grass.BiomassGPerM2 / 175), 0, 0.82) : 0;
-            water[i] = cell.SurfaceWaterMm;
             soilWater[i] = cell.SoilWaterMm;
             soilCapacity[i] = cell.SoilCapacityMm;
             nitrogen[i] = cell.MineralNitrogenGPerM2;
@@ -36,6 +40,7 @@ internal static class PixelTerrainTexture
         grass = SmoothCoverage(grass, world.Width, world.Height);
         for (var i = 0; i < grass.Length; i++)
             if (!world.Cells[i].Grass.Present || world.Cells[i].Grass.BiomassGPerM2 <= 1) grass[i] = 0;
+        var grassAutotile = BuildGrassAutotile(world, detail: Math.Min(4, pixelsPerCell));
         var minimumElevation = elevationGrid.Min();
         var elevationRange = Math.Max(1, elevationGrid.Max() - minimumElevation);
         var surfaceTone = new double[cellCount];
@@ -64,7 +69,6 @@ internal static class PixelTerrainTexture
                 - Sample(elevationGrid, world.Width, world.Height, gx, gy - 0.55)) / 1.1;
             var tone = Sample(surfaceTone, world.Width, world.Height, gx, gy);
             var grassValue = Sample(grass, world.Width, world.Height, gx, gy);
-            var waterValue = Sample(water, world.Width, world.Height, gx, gy);
             var soilWaterValue = Sample(soilWater, world.Width, world.Height, gx, gy);
             var soilCapacityValue = Sample(soilCapacity, world.Width, world.Height, gx, gy);
             var nitrogenValue = Sample(nitrogen, world.Width, world.Height, gx, gy);
@@ -75,23 +79,44 @@ internal static class PixelTerrainTexture
             tone = Math.Clamp(tone + (broad - 0.5) * 0.12, 0, 1);
             var fleck = fine < 0.18 ? -0.07 : fine > 0.88 ? 0.06 : 0;
             var texture = (broad - 0.5) * 0.20 + (medium - 0.5) * 0.14 + fleck;
-            var hillshade = Sample(lighting, world.Width, world.Height, gx, gy);
+            var hillshade = 0.58 + 0.42 * Sample(lighting, world.Width, world.Height, gx, gy);
             var elevation = Math.Clamp((heightM - minimumElevation) / elevationRange, 0, 1);
             var slope = Math.Sqrt(eastDelta * eastDelta + northDelta * northDelta) / 10;
-            var rockExposure = Math.Clamp((slope - 0.18) * 0.64, 0, 0.36);
+            var rockExposure = Math.Clamp((slope - 0.14) * 1.05, 0, 0.55);
 
-            var soil = Mix(new Color(59, 86, 49), new Color(116, 108, 77), (float)Math.Clamp(tone, 0, 1));
-            soil = Mix(soil, new Color(104, 99, 91), (float)rockExposure);
+            var soil = Mix(new Color(86, 108, 64), new Color(142, 133, 94), (float)Math.Clamp(tone, 0, 1));
+            soil = Mix(soil, new Color(116, 112, 96), (float)rockExposure);
             soil = Modulate(soil, hillshade + texture);
 
-            var grassCover = (float)Math.Clamp(SmoothStep(0.10, 0.62,
-                grassValue + (broad - 0.5) * 0.10 + (medium - 0.5) * 0.18 + (fine - 0.5) * 0.08), 0, 0.82);
+            var grassX = Math.Clamp(px * grassAutotile.Detail / pixelsPerCell, 0, grassAutotile.Width - 1);
+            var grassY = Math.Clamp(py * grassAutotile.Detail / pixelsPerCell, 0, grassAutotile.Height - 1);
+            var grassIndex = grassY * grassAutotile.Width + grassX;
+            var neighborCount = CountNeighbors(grassAutotile.NeighborMasks[grassIndex]);
+            var biomassStrength = (float)Math.Clamp(grassValue / 0.82, 0, 1);
+            var grassCover = grassAutotile.States[grassIndex] == 0
+                ? 0
+                : (0.48f + neighborCount * 0.045f) * (0.78f + biomassStrength * 0.22f);
+            if (grassCover > 0)
+            {
+                var mask = grassAutotile.NeighborMasks[grassIndex];
+                var pixelStartX = grassX * pixelsPerCell / grassAutotile.Detail;
+                var pixelEndX = (grassX + 1) * pixelsPerCell / grassAutotile.Detail;
+                var pixelStartY = grassY * pixelsPerCell / grassAutotile.Detail;
+                var pixelEndY = (grassY + 1) * pixelsPerCell / grassAutotile.Detail;
+                var localX = px - pixelStartX;
+                var localY = py - pixelStartY;
+                if ((localX == 0 && localY == 0 && NeedsCornerCut(mask, 0, 6, 7))
+                    || (px == pixelEndX - 1 && localY == 0 && NeedsCornerCut(mask, 0, 2, 1))
+                    || (localX == 0 && py == pixelEndY - 1 && NeedsCornerCut(mask, 4, 6, 5))
+                    || (px == pixelEndX - 1 && py == pixelEndY - 1 && NeedsCornerCut(mask, 4, 2, 3)))
+                    grassCover = 0;
+            }
             var grassColor = season switch
             {
-                Season.Spring => new Color(112, 154, 69),
-                Season.Summer => new Color(85, 130, 57),
-                Season.Autumn => new Color(141, 130, 66),
-                _ => new Color(103, 111, 74)
+                Season.Spring => new Color(128, 158, 81),
+                Season.Summer => new Color(105, 137, 68),
+                Season.Autumn => new Color(153, 143, 71),
+                _ => new Color(102, 112, 77)
             };
             var cover = (float)(grassCover * (1 - elevation * 0.16));
             var surface = Mix(soil, Modulate(grassColor, hillshade + texture * 0.65f), cover);
@@ -106,28 +131,68 @@ internal static class PixelTerrainTexture
                 var biomass = (float)Math.Clamp((grassValue * 450 + Sample(woody, world.Width, world.Height, gx, gy)) / 900, 0, 1);
                 surface = Mix(new Color(56, 70, 48), new Color(100, 167, 73), biomass);
             }
-            else
-            {
-                // L0 water is continuous storage; this irregular edge is visual only.
-                var shoreNoise = (medium - 0.5) * 0.58 + (fine - 0.5) * 0.24;
-                var waterMask = (float)SmoothStep(0.16, 0.78, waterValue * 0.72 + shoreNoise);
-                if (waterValue > 0.04)
-                {
-                    var depth = (float)Math.Clamp(waterValue / 5.0, 0.18, 1);
-                    var waterColor = Mix(new Color(67, 135, 145), new Color(34, 83, 111), depth * 0.68f);
-                    var ripple = fine > 0.74 ? 0.10f : 0;
-                    waterColor = Mix(waterColor, new Color(157, 193, 168), ripple);
-                    surface = Mix(surface, waterColor, waterMask);
-                }
-                if (nitrogenValue > 0 && grassValue > 0.02 && fine > 0.82)
-                    surface = Mix(surface, new Color(133, 149, 83), (float)Math.Min(0.16, nitrogenValue * 0.015));
-            }
+            else if (nitrogenValue > 0 && grassValue > 0.02 && fine > 0.82)
+                surface = Mix(surface, new Color(133, 149, 83), (float)Math.Min(0.16, nitrogenValue * 0.015));
 
             pixels[py * width + px] = surface;
         }
 
         return pixels;
     }
+
+    internal static GrassAutotileField BuildGrassAutotile(WorldSnapshot world, int detail)
+    {
+        if (detail < 1 || detail > 8) throw new ArgumentOutOfRangeException(nameof(detail));
+        var width = world.Width * detail;
+        var height = world.Height * detail;
+        var states = new byte[width * height];
+        var masks = new byte[states.Length];
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            var cell = world.Cells[(y / detail) * world.Width + x / detail];
+            if (!cell.Grass.Present || cell.Grass.BiomassGPerM2 <= 1) continue;
+            var cover = Math.Clamp(1 - Math.Exp(-cell.Grass.BiomassGPerM2 / 125), 0, 1);
+            var broad = CounterRandom.SpatialUnit(world.Seed, 0x4752415353415554UL,
+                x, y, detail * 4, 0, 1);
+            var fine = CounterRandom.SpatialUnit(world.Seed, 0x4752415353415554UL,
+                x, y, detail, 0, 2);
+            var threshold = 0.14 + 0.62 * broad + 0.24 * fine;
+            if (cover >= threshold) states[y * width + x] = 1;
+        }
+
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            var index = y * width + x;
+            if (states[index] == 0) continue;
+            byte mask = 0;
+            for (var bit = 0; bit < GrassNeighbors.Length; bit++)
+            {
+                var (offsetX, offsetY) = GrassNeighbors[bit];
+                var neighborX = x + offsetX;
+                var neighborY = y + offsetY;
+                if (neighborX >= 0 && neighborX < width && neighborY >= 0 && neighborY < height
+                    && states[neighborY * width + neighborX] != 0)
+                    mask |= (byte)(1 << bit);
+            }
+            masks[index] = mask;
+        }
+
+        return new GrassAutotileField(width, height, detail, states, masks);
+    }
+
+    private static int CountNeighbors(byte mask)
+    {
+        var count = 0;
+        for (var bit = 0; bit < GrassNeighbors.Length; bit++) count += (mask >> bit) & 1;
+        return count;
+    }
+
+    private static bool NeedsCornerCut(byte mask, int firstCardinal, int secondCardinal, int diagonal)
+        => (mask & (1 << firstCardinal)) == 0
+            && (mask & (1 << secondCardinal)) == 0
+            && (mask & (1 << diagonal)) == 0;
 
     private static double Sample(double[] values, int width, int height, double x, double y)
     {
@@ -303,4 +368,7 @@ internal static class PixelTerrainTexture
 
         private static double Fade(double t) => t * t * (3 - 2 * t);
     }
+
+    internal readonly record struct GrassAutotileField(
+        int Width, int Height, int Detail, byte[] States, byte[] NeighborMasks);
 }
