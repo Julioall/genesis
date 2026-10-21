@@ -30,7 +30,7 @@
 ## Complemento consultado na revisão documental de 20/10/2026
 
 - FAO, [Optimizing Nitrogen use on the farm](https://www.fao.org/4/y5146e/y5146e09.htm): apoia a interação entre disponibilidade hídrica, N e crescimento e a mineralização do N orgânico. Trata de culturas agrícolas; não fornece coeficientes calibrados para os perfis ecológicos fictícios deste MVP.
-- Fontes MonoGame acima foram consultadas para separar plataforma oficialmente listada de trabalho em andamento. Uma issue aberta ou roadmap não demonstra compatibilidade do jogo, que permanece sem runtime.
+- Na revisão documental de 20/10/2026, as fontes MonoGame acima foram consultadas para separar plataforma oficialmente listada de trabalho em andamento. Uma issue aberta ou roadmap não demonstrava compatibilidade do jogo; o cliente MonoGame mínimo foi implementado depois, nesta branch, sem certificação multiplataforma.
 
 As correções de reprodução, composição de N e transações são requisitos de consistência dos estoques escolhidos, não reprodução integral da fisiologia real nem validação experimental.
 
@@ -45,6 +45,24 @@ Em 20/10/2026 foram confirmados título/autoria/ano e pertinência geral das seg
 - [USGS — Infiltration and the Water Cycle](https://www.usgs.gov/water-science-school/science/infiltration-and-water-cycle): fatores qualitativos que influenciam infiltração; não valida o algoritmo L0.
 
 A resolução direta de alguns DOIs falhou na ferramenta; as páginas das editoras/instituição e a versão do coautor permitiram a conferência acima. Não foi realizada revisão integral de todos os artigos nem calibração de modelos.
+
+## Flora procedural e composição visual (consulta de 21/10/2026)
+
+Consultas feitas no SciSpace e uma síntese de literatura no Consensus foram usadas para separar morfologia vegetal observável de técnicas de desenho. A resposta integral do Consensus, com marcadores e links de citação preservados, está em [síntese procedural de flora e paisagem](research/consensus-procedural-flora.md). Ela também reúne heurísticas gráficas; essas heurísticas não são evidência biológica.
+
+- Nauber, Hodač, Wäldchen & Mäder (2024), [Parametrization of biological assumptions to simulate growth of tree branching architectures](https://doi.org/10.1093/treephys/tpae045), *Tree Physiology* 44. O estudo varia parâmetros funcionais (incluindo resposta à gravidade/luz e shedding) e compara contornos por morfometria geométrica em quatro formas arbóreas. Apoia separar receita de forma e fatores ambientais; a amostra/modelo não calibra nossos patches nem as silhuetas pixel art.
+- Palubicki et al. (2022), [Ecoclimates: climate-response modeling of vegetation](https://doi.org/10.1145/3528223.3530146), *ACM Transactions on Graphics*. O trabalho acopla árvore, solo e gradientes locais de água, temperatura e luz e compara plausibilidade a estudos ambientais. É uma demonstração de simulação/visualização, não valida os coeficientes L0 deste projeto.
+- Stützel & Kahlen (2016), [Virtual Plants: Modeling Plant Architecture in Changing Environments](https://doi.org/10.3389/fpls.2016.01734), *Frontiers in Plant Science*. Contextualiza modelos funcionais-estruturais que distinguem forma, função e ambiente; o texto é editorial e não fornece parâmetros para os nossos grupos funcionais.
+- Prusinkiewicz (1999), [Modeling Plants and Plant Ecosystems: Recent Results and Current Open Problems](https://doi.org/10.1109/CGI.1999.10000). Discute L-systems e interação espacial, registrando problemas em árvores antigas, controle artístico e ecossistemas complexos. A gramática de desenho é uma opção computacional, não uma lei de crescimento.
+- Li et al. (2021), [Learning to reconstruct botanical trees from single images](https://doi.org/10.1145/3478513.3480525), *ACM Transactions on Graphics*. A reconstrução usa volumes radiais de copa inferidos de imagens; depende de dados/imagens e não é requisito para geração por regras do L0.
+- Blaise, Barczi & Jaeger (1998), [Simulation of the growth of plants: modeling of metamorphosis and spatial interactions in the architecture and development of plants](https://doi.org/10.1007/978-4-431-67941-7_6). Descreve eixos de referência, eventos discretos e interações espaciais/ambientais; é uma alternativa de maior custo que não adotamos para o patch agregado.
+
+**Decisão artística para o cliente mínimo:** gerar terreno, rochas, gramíneas, estrutura lenhosa e pequenas massas de folhas por código; quantizar pixels e cachear texturas por receita/variante visual/estação. A seed visual é derivada separadamente e nunca entra em fluxos ecológicos. A camada de folhas pode mudar aparência sazonal a partir do calendário, mas não cria folhas como estoque, nem muda biomassa, cobertura, água ou N. Silhuetas, cores de estação, agrupamento de rochas e densidade de pixels são escolhas de legibilidade, não inferências botânicas ou geológicas. Os parâmetros de biomassa, cobertura e sazonalidade da simulação permanecem os da ficha L0; nenhuma alteração quantitativa é proposta.
+
+**Referência de implementação:** o Game Studio skill foi consultado como guia de organização de loop, superfícies de apresentação, pipeline visual e validação. Suas rotas padrão web/Phaser não se aplicam aqui: o contrato do projeto e a solicitação desta etapa fixam C# e MonoGame. O cliente será um adaptador sobre snapshots; a simulação continuará headless e não dependerá de MonoGame.
+
+- MonoGame, [Supported Platforms](https://docs.monogame.net/articles/getting_started/platforms.html): a documentação lista DesktopGL para Windows/macOS/Linux. A escolha de `MonoGame.Framework.DesktopGL` é de compatibilidade do cliente, não uma promessa de navegador.
+- MonoGame, [Texture Sampling and Tiling Backgrounds](https://docs.monogame.net/articles/tutorials/building_2d_games/18_texture_sampling/index.html): `PointClamp` preserva pixels nítidos em texturas ampliadas; é uma decisão de renderização, sem consequência para o estado do mundo.
 
 
 ## Referências do contrato L0 (consulta de 21/10/2026)

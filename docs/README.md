@@ -25,6 +25,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Testes e gates](13_TESTS.md)
 - [Viabilidade de navegador](14_WEB_GATE.md)
 - [Pesquisa científica](15_RESEARCH.md)
+- [Síntese visual procedural do Consensus](research/consensus-procedural-flora.md)
 - [Legado e reutilização](16_LEGACY.md)
 - [Templates técnicos](17_TEMPLATES.md)
 
