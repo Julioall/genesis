@@ -54,10 +54,16 @@ Cada teste registra `build`, `worldSeed`, `scenarioVersion`, parâmetros complet
 | T24 | cadências diferentes e chuva horária | cada janela de fluxo é consumida uma vez; save preserva próxima execução |
 | T25 | escala espacial, movimento e estado inválido | mm × área converte para litros; velocidade respeita distância/tempo; NaN/Infinity rejeitados |
 
-Esses são critérios para a implementação futura. Na revisão documental só se verificam coerência, referências locais e cobertura de requisitos; não declarar esses experimentos executados sem runtime.
+Esses são critérios para a implementação futura. Na revisão documental de 20/10/2026 só se verificaram coerência, referências locais e cobertura de requisitos; os resultados efetivamente executados depois estão registrados na seção abaixo.
 
 ## Aplicação incremental dos gates
 
 N0 verifica boot, pausa, dependências e determinismo do estado mínimo. N1 exercita T01–T06, a parte hídrica de T16/T22/T24/T25 e contratos utilizados. N2 adiciona T07–T08, T12, T19 vegetal e T23; N3 adiciona T09–T11, T19 animal, T20–T21. T13–T15 usam fixtures pequenas à medida que os contratos existem. N4 reúne T01–T25, incluindo T17–T18 e medições gráficas. Nenhum marco inicial exige implementar os sistemas dos marcos seguintes para executar testes que ainda não se aplicam.
 
 No cenário integrado T18, declarar antes da execução duração, ticks, seeds, estoques iniciais e quais elos causais devem ser observados. A duração deve permitir demonstrar crescimento, consumo, morte e reciclagem, com reprodução verificada nos cenários próprios. Extinção explicada pode passar; uma população que desaparece antes de exercitar a cadeia torna essa demonstração inconclusiva, sem autorizar respawn corretivo.
+
+## Evidência executada nesta branch
+
+O escopo implementado é N0–N2, sem fauna. `dotnet build Game.sln -c Release` compila runner, módulos, cliente DesktopGL e testes. `dotnet test Game.sln -c Release` cobre o vetor RNG L0, repetibilidade e partição de ticks, snapshot imutável, geometria solar, chuva/solo saturado, escoamento D8, crescimento limitado por luz/água/N, decomposição e conservação de massa/N, continuação após save/load no meio do dia e cadência diária. Os casos futuros T09–T11 e a parte animal de T19–T21 permanecem fora do escopo e não foram executados.
+
+Smoke runs adicionais avançaram seeds 1, 2 e 3 por 52.560 ticks cada. Isso evidencia execução longa e terminações finitas para essas seeds; não substitui a instrumentação completa de T01–T25, métricas P95/perfilamento ou validação de campo. A aplicação MonoGame foi iniciada como smoke test; não houve inspeção visual automatizada nem certificação de FPS.

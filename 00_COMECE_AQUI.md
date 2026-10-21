@@ -1,12 +1,12 @@
 # Systema Naturae — Pacote de fundação do mundo natural
 
-> **Estado atual: documentação pronta para implementação.** A revisão documental foi concluída; este pacote descreve o projeto, mas ainda não contém solution, runtime ou implementação C#. Siga o escopo, o roadmap e os critérios de aceite antes de iniciar cada marco.
+> **Estado atual: N0–N2 executáveis nesta branch.** O runtime termina na flora, exclui fauna e não declara o MVP Natural completo. Consulte o [README](README.md) para comandos, cobertura validada e limites. Esta implementação parte da especificação e preserva os valores L0; os marcos posteriores continuam no roadmap.
 
 - **Repositório-alvo:** https://github.com/Julioall/genesis.git
 - **Repositório de referência (somente leitura):** https://github.com/Julioall/Spectators-of-Life
 - **Data da revisão:** 21/10/2026
 - **Revisão de organização:** 2.1 — ScientificFoundation passou a `docs/science/` sem projeto C#.
-- **Estado:** especificação de implementação e critérios de validação; não representa código já implementado.
+- **Estado:** especificação e critérios de validação para um runtime N0–N2 implementado nesta branch; os documentos de roadmap continuam descrevendo requisitos futuros.
 - **Designação interna:** Systema Naturae / APMA-Natural 2.0; o nome comercial do jogo não deve aparecer em namespaces ou pastas de código.
 
 ## Missão
@@ -30,7 +30,7 @@ Construir do zero uma base C# modular, procedural e reprodutível para simular u
 
 As decisões e pesquisas ficam sob `docs/` (GDD, arquitetura, specs, ADRs e `docs/science/`). O runtime C# fica sob `src/Game.*` e não contém uma biblioteca `Game.ScientificFoundation`. Veja [`docs/README.md`](docs/README.md).
 
-## Ponto de partida para implementação
+## Ponto de partida e navegação
 
 1. Leia [`docs/00_SCOPE.md`](docs/00_SCOPE.md), [`docs/01_ARCHITECTURE.md`](docs/01_ARCHITECTURE.md), [`docs/science/README.md`](docs/science/README.md), [`docs/03_MODULES.md`](docs/03_MODULES.md) e [`docs/GDD.md`](docs/GDD.md) antes de escrever código.
 2. Para cada sistema, consulte [`docs/04_OWNERSHIP.md`](docs/04_OWNERSHIP.md), [`docs/05_CONTRACTS.md`](docs/05_CONTRACTS.md), [`docs/06_FLUX_LEDGER.md`](docs/06_FLUX_LEDGER.md) e [`docs/07_SCHEDULER.md`](docs/07_SCHEDULER.md).
@@ -38,12 +38,12 @@ As decisões e pesquisas ficam sob `docs/` (GDD, arquitetura, specs, ADRs e `doc
 4. Leia [`docs/14_WEB_GATE.md`](docs/14_WEB_GATE.md) antes de consolidar infraestrutura dependente de renderizador.
 5. Siga [`docs/19_CODING_RULES.md`](docs/19_CODING_RULES.md) e registre decisões arquiteturais duráveis em [`docs/decisions/`](docs/decisions/README.md).
 
-## Entrega final desejada
+## Entrega final desejada (visão futura)
 
 Uma aplicação desktop top-down com geração procedural de terreno, sol e estações, eventos meteorológicos, água superficial/solo, ao menos dois tipos funcionais de vegetação, dois perfis animais simples (herbívoro e predador), detritos/decompositores agregados, balanços auditáveis, interface de inspeção por célula/organismo, pausa/velocidade, seed, save/load e teste headless. Não forçar equilíbrio: extinção local pode ocorrer se recursos acabarem.
 
-**IMPORTANTE:** nenhum arquivo deste pacote demonstra que o novo repositório já implementou essas funcionalidades. Esta é a especificação entregue ao Codex.
+**Nota de escopo:** a visão acima também inclui fauna e interface completa, que não fazem parte do runtime N0–N2 atual. O estado desta branch e as limitações estão documentados no [README](README.md).
 
 ## Leitura da revisão atual
 
-A revisão documental 2.6 alinha o roadmap ao cenário L0 v2 sem alterar seu contrato quantitativo. As equações, parâmetros, tolerâncias e metas do primeiro cenário permanecem centralizados em [modelos e metas](docs/20_L0_MODEL_AND_BENCHMARKS.md); o [parecer](docs/18_DOCUMENT_REVIEW.md) registra as revisões e as [regras de codificação](docs/19_CODING_RULES.md) orientam a implementação. As specs de domínio mantêm responsabilidades e limites. Em caso de conflito, corrigir os documentos envolvidos antes de implementar. A árvore de código continua apenas proposta; nenhum projeto foi criado.
+A revisão documental 2.6 alinha o roadmap ao cenário L0 v2 sem alterar seu contrato quantitativo. As equações, parâmetros, tolerâncias e metas do primeiro cenário permanecem centralizados em [modelos e metas](docs/20_L0_MODEL_AND_BENCHMARKS.md); o [parecer](docs/18_DOCUMENT_REVIEW.md) registra as revisões e as [regras de codificação](docs/19_CODING_RULES.md) orientam evoluções futuras. O runtime N0–N2 e a cobertura executada estão resumidos no [README](README.md).
