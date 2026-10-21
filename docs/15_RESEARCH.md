@@ -75,3 +75,15 @@ SciSpace foi usado para localizar trabalhos sobre balanço diário de água/radi
 - Bolker, Pacala & Parton (1998), [simplifying the Century decomposition model](https://doi.org/10.1890/1051-0761(1998)008%5B0425%3ALAOSDI%5D2.0.CO%3B2); Lutz et al. (2019), [LPJmL](https://gmd.copernicus.org/articles/12/2419/2019/), referências para cinética de primeira ordem modulada por condições ambientais.
 
 Essas fontes apoiam escolhas de forma e não testam coeficientes, perfis animais, chuva sintética ou tolerâncias do cenário `temperate-valley-l0-v2`.
+
+## Revisão visual da referência de paisagem (21/10/2026)
+
+A imagem enviada como alvo mostra um recorte panorâmico de vale em pixel art: terreno contínuo sem contornos de célula, grupos irregulares de coníferas e árvores de folhas largas, afloramentos, cobertura baixa e água com margens sinuosas. Essa composição é uma referência artística, não evidência sobre o relevo ou a flora do cenário L0.
+
+- A apresentação MonoGame usa uma transformação oblíqua suave da superfície e mantém os sprites de plantas na tela, com ordenação pelo eixo de profundidade projetado. O relevo físico continua vindo de `TerrainModel`; a transformação não cria degraus, voxels ou elevação nova.
+- A paleta do solo usa interpolação bilinear, ruído visual determinístico em mais de uma escala e sombreamento derivado da elevação. A inspiração para a suavização regional 5×5 e o hillshade veio da leitura do renderer em `Spectators-of-Life`; esse checkout foi consultado somente para leitura. Os coeficientes desta implementação são artísticos e não substituem a topografia L0.
+- A cobertura de grama é suavizada para formar manchas e depois limitada às células que têm biomassa de grama no snapshot. O autotile usa vizinhança de 8 células com diagonais condicionadas pelas cardinais; tufos e flores são apenas detalhes de desenho.
+- As rochas recebem silhuetas facetadas e detritos por uma regra de colocação visual baseada na elevação. As probabilidades e paletas são heurísticas de apresentação; não representam litologia ou estoque geológico simulado.
+- `V` percorre quatro paletas sazonais de apresentação, começando no verão para permitir observar a copa cheia. O HUD separa `ART` de `SIM`: essa prévia muda as cores do terreno e das folhas, sem alterar calendário, biomassa, água, nitrogênio ou aleatoriedade ecológica.
+
+Esta passada ainda não reproduz o alvo completo: o cenário inicial pode ter pouca água superficial, a grade L0 tem resolução limitada e a imagem gerada ainda depende da distribuição de plantas existente no snapshot. Não se desenha um rio sem estado de água que o sustente, nem se aumenta a população para preencher a cena. Esses limites precisam ser considerados em qualquer nova evolução visual.
