@@ -38,9 +38,7 @@ internal static class PixelTerrainTexture
             woody[i] = cell.Woody.Present ? cell.Woody.BiomassGPerM2 : 0;
         }
         grass = SmoothCoverage(grass, world.Width, world.Height);
-        for (var i = 0; i < grass.Length; i++)
-            if (!world.Cells[i].Grass.Present || world.Cells[i].Grass.BiomassGPerM2 <= 1) grass[i] = 0;
-        var grassAutotile = BuildGrassAutotile(world, detail: Math.Min(4, pixelsPerCell));
+        var grassAutotile = BuildGrassAutotile(world, detail: Math.Min(8, pixelsPerCell));
         var minimumElevation = elevationGrid.Min();
         var elevationRange = Math.Max(1, elevationGrid.Max() - minimumElevation);
         var surfaceTone = new double[cellCount];
@@ -82,10 +80,13 @@ internal static class PixelTerrainTexture
             var hillshade = 0.58 + 0.42 * Sample(lighting, world.Width, world.Height, gx, gy);
             var elevation = Math.Clamp((heightM - minimumElevation) / elevationRange, 0, 1);
             var slope = Math.Sqrt(eastDelta * eastDelta + northDelta * northDelta) / 10;
-            var rockExposure = Math.Clamp((slope - 0.14) * 1.05, 0, 0.55);
+            var rockThreshold = 0.25 + (broad - 0.5) * 0.12 + (medium - 0.5) * 0.10;
+            var rockExposure = SmoothStep(rockThreshold, rockThreshold + 0.38, slope) * 0.56;
+            var soilMoisture = (float)Math.Clamp(soilWaterValue / Math.Max(1, soilCapacityValue), 0, 1);
 
             var soil = Mix(new Color(86, 108, 64), new Color(142, 133, 94), (float)Math.Clamp(tone, 0, 1));
             soil = Mix(soil, new Color(116, 112, 96), (float)rockExposure);
+            soil = Mix(soil, new Color(66, 86, 57), soilMoisture * 0.18f);
             soil = Modulate(soil, hillshade + texture);
 
             var grassX = Math.Clamp(px * grassAutotile.Detail / pixelsPerCell, 0, grassAutotile.Width - 1);
@@ -118,8 +119,13 @@ internal static class PixelTerrainTexture
                 Season.Autumn => new Color(153, 143, 71),
                 _ => new Color(102, 112, 77)
             };
+            grassColor = Mix(grassColor, new Color(91, 132, 65), soilMoisture * 0.20f);
+            // The autotile supplies living blades; this softer pigment pass only blends ground
+            // material between adjacent biomass cells and does not create extra plant cohorts.
             var cover = (float)(grassCover * (1 - elevation * 0.16));
             var surface = Mix(soil, Modulate(grassColor, hillshade + texture * 0.65f), cover);
+            var groundPigment = biomassStrength * 0.14f;
+            surface = Mix(surface, Modulate(new Color(82, 108, 57), hillshade + texture * 0.35f), groundPigment);
 
             if (overlayMode == 1)
             {
@@ -154,10 +160,12 @@ internal static class PixelTerrainTexture
             if (!cell.Grass.Present || cell.Grass.BiomassGPerM2 <= 1) continue;
             var cover = Math.Clamp(1 - Math.Exp(-cell.Grass.BiomassGPerM2 / 125), 0, 1);
             var broad = CounterRandom.SpatialUnit(world.Seed, 0x4752415353415554UL,
-                x, y, detail * 4, 0, 1);
+                x, y, detail * 6, 0, 1);
+            var middle = CounterRandom.SpatialUnit(world.Seed, 0x4752415353415554UL,
+                x, y, detail * 2, 0, 2);
             var fine = CounterRandom.SpatialUnit(world.Seed, 0x4752415353415554UL,
-                x, y, detail, 0, 2);
-            var threshold = 0.14 + 0.62 * broad + 0.24 * fine;
+                x, y, detail, 0, 3);
+            var threshold = 0.10 + 0.48 * broad + 0.28 * middle + 0.14 * fine;
             if (cover >= threshold) states[y * width + x] = 1;
         }
 

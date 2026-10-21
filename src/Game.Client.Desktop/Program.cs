@@ -46,6 +46,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private readonly int? _benchmarkDurationSeconds;
     private readonly List<double> _benchmarkFrameTimesMs = [];
     private readonly Dictionary<VisualKey, Texture2D> _visualCache = [];
+    private readonly List<GroundSprite> _groundSprites = [];
     private readonly Dictionary<char, string[]> _glyphs = TinyFont.Glyphs;
     private SpriteBatch _batch = null!;
     private Texture2D _pixel = null!;
@@ -67,6 +68,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private double _centerElevationM;
     private long _terrainRevision = -1;
     private long _waterRevision = -1;
+    private long _groundSpritesTick = -1;
+    private ulong _groundSpritesSeed = ulong.MaxValue;
+    private int _groundSpritesViewportWidth = -1;
+    private int _groundSpritesViewportHeight = -1;
+    private Season _groundSpritesSeason = Season.Summer;
     private int _terrainOverlay = -1;
     private WorldSimulation _world = WorldSimulation.Create(1);
     private WorldSnapshot _snapshot = null!;
@@ -305,31 +311,45 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
     private void DrawGroundObjects()
     {
-        // Render back-to-front using the projected ground-plane Y coordinate.
+        EnsureGroundSprites();
+        foreach (var sprite in _groundSprites)
+            _batch.Draw(TextureFor(sprite.Key), sprite.Destination, Color.White);
+    }
+
+    private void EnsureGroundSprites()
+    {
+        var viewport = GraphicsDevice.Viewport;
+        if (_groundSpritesTick == _snapshot.TickIndex && _groundSpritesSeed == _snapshot.Seed
+            && _groundSpritesViewportWidth == viewport.Width && _groundSpritesViewportHeight == viewport.Height
+            && _groundSpritesSeason == VisualSeason)
+            return;
+
+        _groundSprites.Clear();
+        void Add(VisualKey key, Vector3 ground, int x, int y, int width, int height)
+            => _groundSprites.Add(new GroundSprite(key, new Rectangle(x, y, width, height), ground.Z, _groundSprites.Count));
+
+        // Rebuild projected placements only when the snapshot, camera surface, or visual season changes.
+        Span<TreeVisual> treeVisuals = stackalloc TreeVisual[5];
         foreach (var index in DepthOrder)
         {
             var cell = _snapshot.Cells[index];
             var visualSeed = CounterRandom.VisualBits(_snapshot.Seed, cell.Index, 0x4752415353UL);
-            var ground = GroundToScreen((cell.X + 0.5) * Tile, cell.ElevationM, (cell.Y + 0.5) * Tile);
-
-            if (cell.Woody.Present && cell.Woody.BiomassGPerM2 > 1)
-            {
-                var bucket = Math.Clamp((int)(cell.Woody.BiomassGPerM2 / 450), 1, 4);
-                var size = 35 + bucket * 8;
-                var shadowWidth = size + 12 + (int)(visualSeed & 5);
-                DrawSprite(TextureFor(new(VisualKind.Shadow, (int)(visualSeed & 7), bucket, VisualSeason)),
-                    (int)ground.X - shadowWidth / 2 + 7, (int)ground.Y - Math.Max(4, size / 5), shadowWidth,
-                    Math.Max(8, size / 2));
-            }
+            var cellWorldX = (cell.X + 0.5) * Tile;
+            var cellWorldZ = (cell.Y + 0.5) * Tile;
 
             if (RockVisible(cell, visualSeed))
             {
                 var rockVariant = (int)(visualSeed & 7);
                 var rockWidth = 23 + rockVariant * 3;
                 var rockHeight = 16 + rockVariant * 2;
-                var rockOffsetX = (int)(visualSeed >> 9 & 7) - 3;
-                DrawSprite(TextureFor(new(VisualKind.Rock, rockVariant, 1, VisualSeason)),
-                    (int)ground.X - rockWidth / 2 + rockOffsetX, (int)ground.Y - rockHeight + 4,
+                var rockWorldX = cellWorldX + (CounterRandom.Unit(_snapshot.Seed, 0x524F434B504F5358UL,
+                    (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.56;
+                var rockWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x524F434B504F535AUL,
+                    (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.56;
+                var rockElevation = _terrainHeightSampler(rockWorldX / Tile, rockWorldZ / Tile);
+                var rockGround = ProjectGround(rockWorldX, rockElevation, rockWorldZ);
+                Add(new(VisualKind.Rock, rockVariant, 1, VisualSeason), rockGround,
+                    (int)rockGround.X - rockWidth / 2, (int)rockGround.Y - rockHeight + 4,
                     rockWidth, rockHeight);
             }
 
@@ -355,10 +375,15 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                             0x4752415353UL + (ulong)tuft);
                         var width = 12 + (int)(tuftSeed & 3) + bucket;
                         var height = 10 + (int)(tuftSeed >> 4 & 3) + bucket * 2;
-                        var offsetX = (int)(tuftSeed >> 10 & 15) - 7 + (tuft == 1 ? 5 : 0);
+                        var tuftWorldX = cellWorldX + (CounterRandom.Unit(_snapshot.Seed, 0x4752415353504F53UL,
+                            (ulong)cell.Index, (ulong)tuft, 0, 0) - 0.5) * Tile * 0.72;
+                        var tuftWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x4752415353504F5AUL,
+                            (ulong)cell.Index, (ulong)tuft, 0, 0) - 0.5) * Tile * 0.72;
+                        var tuftElevation = _terrainHeightSampler(tuftWorldX / Tile, tuftWorldZ / Tile);
+                        var tuftGround = ProjectGround(tuftWorldX, tuftElevation, tuftWorldZ);
                         var offsetY = (int)(tuftSeed >> 14 & 7) - 3 - (tuft == 1 ? 2 : 0);
-                        DrawSprite(TextureFor(new(VisualKind.Grass, (int)(tuftSeed >> 8 & 15), bucket, VisualSeason)),
-                            (int)ground.X - width / 2 + offsetX, (int)ground.Y - height + offsetY, width, height);
+                        Add(new(VisualKind.Grass, (int)(tuftSeed >> 8 & 15), bucket, VisualSeason), tuftGround,
+                            (int)tuftGround.X - width / 2, (int)tuftGround.Y - height + offsetY, width, height);
                     }
                 }
 
@@ -371,10 +396,15 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     {
                         var flowerWidth = 7 + (int)(flowerSeed & 3);
                         var flowerHeight = 8 + (int)(flowerSeed >> 4 & 4);
-                        var flowerOffset = (int)(flowerSeed >> 8 & 19) - 9;
-                        DrawSprite(TextureFor(new(VisualKind.Wildflower, (int)(flowerSeed >> 16 & 7), bucket, VisualSeason)),
-                            (int)ground.X - flowerWidth / 2 + flowerOffset,
-                            (int)ground.Y - flowerHeight + 1, flowerWidth, flowerHeight);
+                        var flowerWorldX = cellWorldX + (CounterRandom.Unit(_snapshot.Seed, 0x464C4F57504F5358UL,
+                            (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.72;
+                        var flowerWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x464C4F57504F535AUL,
+                            (ulong)cell.Index, 0, 0, 0) - 0.5) * Tile * 0.72;
+                        var flowerElevation = _terrainHeightSampler(flowerWorldX / Tile, flowerWorldZ / Tile);
+                        var flowerGround = ProjectGround(flowerWorldX, flowerElevation, flowerWorldZ);
+                        Add(new(VisualKind.Wildflower, (int)(flowerSeed >> 16 & 7), bucket, VisualSeason), flowerGround,
+                            (int)flowerGround.X - flowerWidth / 2,
+                            (int)flowerGround.Y - flowerHeight + 1, flowerWidth, flowerHeight);
                     }
                 }
             }
@@ -392,18 +422,67 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     var scale = tree == 0 ? 1.0 : 0.62 + CounterRandom.Unit(_snapshot.Seed,
                         0x47524F564553495AUL, (ulong)cell.Index, (ulong)tree, 0, 0) * 0.14;
                     var size = (int)Math.Round(matureSize * scale);
-                    var offsetX = tree == 0
-                        ? (int)(visualSeed >> 28 & 7) - 3
-                        : (int)(treeSeed & 15) - 7;
-                    var offsetY = tree == 0 ? (int)(visualSeed >> 35 & 5) - 2 : 0;
-                    var anchorY = (int)ground.Y + offsetY - (int)Math.Round(size * (184.0 / 192));
+                    var treeWorldX = cellWorldX + (CounterRandom.Unit(_snapshot.Seed, 0x54524545504F5358UL,
+                        (ulong)cell.Index, (ulong)tree, 0, 0) - 0.5) * Tile * 0.68;
+                    var treeWorldZ = cellWorldZ + (CounterRandom.Unit(_snapshot.Seed, 0x54524545504F535AUL,
+                        (ulong)cell.Index, (ulong)tree, 0, 0) - 0.5) * Tile * 0.68;
+                    var treeElevation = _terrainHeightSampler(treeWorldX / Tile, treeWorldZ / Tile);
+                    var treeGround = ProjectGround(treeWorldX, treeElevation, treeWorldZ);
                     var artVariant = speciesRow * 4 + (int)(treeSeed >> 11 & 3);
-                    DrawSprite(TextureFor(new(VisualKind.Woody, artVariant, bucket, VisualSeason)),
-                        (int)ground.X - size / 2 + offsetX, anchorY, size, size);
+                    var shadowWidth = size + 12 + (int)(treeSeed & 5);
+                    treeVisuals[tree] = new TreeVisual(treeSeed, size, artVariant, shadowWidth, treeWorldZ, treeGround);
+                }
+
+                for (var tree = 1; tree < treeCount; tree++)
+                {
+                    var value = treeVisuals[tree];
+                    var position = tree;
+                    while (position > 0 && treeVisuals[position - 1].WorldZ > value.WorldZ)
+                    {
+                        treeVisuals[position] = treeVisuals[position - 1];
+                        position--;
+                    }
+                    treeVisuals[position] = value;
+                }
+
+                var shadowAnchor = treeVisuals[0];
+                for (var tree = 0; tree < treeCount; tree++)
+                {
+                    var visual = treeVisuals[tree];
+                    if (visual.Size > shadowAnchor.Size) shadowAnchor = visual;
+                }
+                Add(new(VisualKind.Shadow, (int)(shadowAnchor.Seed & 7), bucket, VisualSeason), shadowAnchor.Ground,
+                    (int)shadowAnchor.Ground.X - shadowAnchor.ShadowWidth / 2 + 7,
+                    (int)shadowAnchor.Ground.Y - Math.Max(4, shadowAnchor.Size / 5),
+                    shadowAnchor.ShadowWidth, Math.Max(8, shadowAnchor.Size / 2));
+
+                for (var tree = 0; tree < treeCount; tree++)
+                {
+                    var visual = treeVisuals[tree];
+                    var anchorY = (int)visual.Ground.Y - (int)Math.Round(visual.Size * (184.0 / 192));
+                    Add(new(VisualKind.Woody, visual.ArtVariant, bucket, VisualSeason), visual.Ground,
+                        (int)visual.Ground.X - visual.Size / 2, anchorY, visual.Size, visual.Size);
                 }
             }
         }
+
+        _groundSprites.Sort(static (first, second) =>
+        {
+            var depth = second.Depth.CompareTo(first.Depth);
+            return depth != 0 ? depth : first.SortOrder.CompareTo(second.SortOrder);
+        });
+
+        _groundSpritesTick = _snapshot.TickIndex;
+        _groundSpritesSeed = _snapshot.Seed;
+        _groundSpritesViewportWidth = viewport.Width;
+        _groundSpritesViewportHeight = viewport.Height;
+        _groundSpritesSeason = VisualSeason;
     }
+
+    private readonly record struct TreeVisual(
+        ulong Seed, int Size, int ArtVariant, int ShadowWidth, double WorldZ, Vector3 Ground);
+
+    private readonly record struct GroundSprite(VisualKey Key, Rectangle Destination, float Depth, int SortOrder);
 
     private void DrawHud()
     {
@@ -1411,11 +1490,10 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _projection = Matrix.CreateOrthographic(viewWidth, viewHeight, 1f, 4000f);
     }
 
-    private Vector2 GroundToScreen(double worldX, double elevationM, double worldZ)
+    private Vector3 ProjectGround(double worldX, double elevationM, double worldZ)
     {
-        var projected = GraphicsDevice.Viewport.Project(
+        return GraphicsDevice.Viewport.Project(
             new Vector3((float)worldX, (float)elevationM, (float)worldZ), _projection, _view, Matrix.Identity);
-        return new Vector2(projected.X, projected.Y);
     }
 
     private bool TryGetCellAtScreen(int screenX, int screenY, out WorldCell cell)
@@ -1488,6 +1566,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         if (!File.Exists(_savePath)) return;
         _world = WorldSimulation.Load(File.ReadAllText(_savePath));
         _snapshot = _world.Snapshot();
+        _groundSpritesTick = -1;
         _tickAccumulator = 0;
         BuildTerrainGeometry();
         RefreshTerrainTexture(force: true);

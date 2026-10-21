@@ -1,4 +1,5 @@
 using Game.Client.Desktop;
+using Game.Contracts;
 using Game.Core;
 
 namespace Game.Tests;
@@ -11,11 +12,24 @@ public sealed class PixelTerrainTextureTests
     ];
 
     [Fact]
-    public void Grass_autotile_is_seeded_connected_and_stays_inside_living_cells()
+    public void Ground_texture_is_repeatable_and_contains_procedural_surface_variation()
     {
         var snapshot = WorldSimulation.Create(1).Snapshot();
-        var field = PixelTerrainTexture.BuildGrassAutotile(snapshot, detail: 4);
-        var repeat = PixelTerrainTexture.BuildGrassAutotile(snapshot, detail: 4);
+        var first = PixelTerrainTexture.Generate(snapshot, pixelsPerCell: 4, overlayMode: 0, visualSeason: Season.Summer);
+        var repeat = PixelTerrainTexture.Generate(snapshot, pixelsPerCell: 4, overlayMode: 0, visualSeason: Season.Summer);
+
+        Assert.Equal(first, repeat);
+        Assert.True(first.Distinct().Count() > 16, "The procedural terrain surface should contain multiple material and lighting colors.");
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    public void Grass_autotile_is_seeded_connected_and_stays_inside_living_cells(int detail)
+    {
+        var snapshot = WorldSimulation.Create(1).Snapshot();
+        var field = PixelTerrainTexture.BuildGrassAutotile(snapshot, detail);
+        var repeat = PixelTerrainTexture.BuildGrassAutotile(snapshot, detail);
 
         Assert.Equal(field.States, repeat.States);
         Assert.Equal(field.NeighborMasks, repeat.NeighborMasks);

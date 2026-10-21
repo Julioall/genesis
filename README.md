@@ -17,7 +17,7 @@ dotnet run --project src/Game.App/Game.App.csproj -c Release -- --load world.jso
 dotnet run --project src/Game.Client.Desktop/Game.Client.Desktop.csproj -c Release
 ```
 
-O runner usa `temperate-valley-l0-v13`, seed 1 por padrão e ticks de 10 minutos. A janela começa a 6 ticks simulados por segundo. Teclas `1/2/3` alternam o fundo entre relevo, água do solo e biomassa; `Space` pausa; `+/-` muda a velocidade; `F5/F9` salva/carrega em `%LOCALAPPDATA%/Game/natural-world-save.json`. Passe o mouse sobre uma célula para inspecionar seus campos.
+O runner usa `temperate-valley-l0-v14`, seed 1 por padrão e ticks de 10 minutos. A janela começa a 6 ticks simulados por segundo. Teclas `1/2/3` alternam o fundo entre relevo, água do solo e biomassa; `Space` pausa; `+/-` muda a velocidade; `F5/F9` salva/carrega em `%LOCALAPPDATA%/Game/natural-world-save.json`. Passe o mouse sobre uma célula para inspecionar seus campos.
 
 ## O que está implementado
 

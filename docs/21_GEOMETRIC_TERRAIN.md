@@ -36,9 +36,17 @@ As referências de Mapgen4 e do artigo Polygonal Map Generation orientam a separ
 - A captura `genesis-flora-v15-canopy-groves.png` confirma a leitura de bosques mais cheios. A medição Release de 60 s permanece dentro da meta N4; os valores completos constam em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
 - A captura `genesis-flora-v17-highland-forest.png` registra o cenário ecológico v13 com cobertura lenhosa aumentada e limite de inclinação de 1.0 m/m. Ela mostra bosques maiores sobre as encostas, mas ainda tem áreas altas expostas e rios largos em comparação com a referência; hashes e benchmark desta revisão estão em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
 
+## Revisão visual v23 — ancoragem e profundidade da flora
+
+- O autotile de grama usa até 8 × 8 subcélulas por célula ecológica, combinando ruído espacial em escalas próximas a 6, 2 e 1 células. Um pigmento suave de solo e umidade mistura materiais nas bordas sem criar indivíduos nem alterar biomassa. A textura continua determinística e gerada em memória.
+- Pedras, tufos, flores e árvores recebem coordenadas locais estáveis dentro de cada célula; cada âncora consulta a mesma altitude física usada pelo terreno. Todos os sprites são ordenados de trás para frente pela profundidade projetada pela câmera. As posições projetadas ficam em cache até mudar snapshot, resolução ou estação visual.
+- Esta é uma alteração exclusiva de apresentação. O cenário e a geografia física continuam em `temperate-valley-l0-v14`; o campo de elevação e a malha geométrica não foram alterados.
+- A captura `genesis-geometric-v23-depth-sort.png` está fora do repositório no diretório de visualizações do Codex. A malha contínua, os paredões e a ancoragem física estão visíveis, mas a imagem ainda fica distante da referência: o vale e os canais são largos, os bosques têm bordas em manchas e a geografia permanece concentrada em duas cordilheiras e três afloramentos.
+- `dotnet test Game.sln -c Release --nologo`: 21/21 aprovados. Benchmark Release de 60 s, seed 1, 1280 × 720 e 6 ticks/s: média 58.63 FPS, P95 21.74 ms, P99 50.39 ms, CPU 53.5% de um núcleo e working set 171.4 MiB. O P99 excedeu a meta de 50 ms por 0.39 ms nesta amostra.
+
 ## Limites desta etapa
 
-O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos por lado; não há LOD, streaming ou reconstrução seletiva. As cordilheiras têm encostas contínuas; três afloramentos possuem faces verticais explícitas. A drenagem usa o receptor D8 de maior declive e depressões locais, sem erosão que atualize o relevo, transporte de sedimentos ou chuva orográfica. O nível visual da água ainda aproxima a profundidade em vez de resolver uma superfície livre hidrostática. A flora usa faixas de altitude, inclinação e água determinísticas, não associações calibradas por espécie ou dados de campo.
+O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos por lado; não há LOD, streaming ou reconstrução seletiva. As cordilheiras têm encostas contínuas; três afloramentos possuem faces verticais explícitas. A drenagem usa o receptor D8 de maior declive e depressões locais, sem erosão que atualize o relevo, transporte de sedimentos ou chuva orográfica. O nível visual da água ainda aproxima a profundidade em vez de resolver uma superfície livre hidrostática. A flora usa faixas de altitude, inclinação e água determinísticas, não associações calibradas por espécie ou dados de campo. A malha já tem altitude geométrica, mas ainda faltam regiões geográficas mais diversas, erosão e uma rede de água contínua com quedas ligada aos níveis físicos.
 
 ## Revisão geométrica v18 — relevo multiescala
 
