@@ -8,7 +8,7 @@ As equações abaixo são o contrato L0 para a implementação futura. Os valore
 
 | Parâmetro | Valor L0 |
 |---|---:|
-| `scenarioId` | `temperate-valley-l0-v13` |
+| `scenarioId` | `temperate-valley-l0-v14` |
 | Seed canônica | `1` (hexadecimal `0x0000000000000001`) |
 | Seeds de integração | `1`, `2`, `3` |
 | Grade | 64 × 64 células finitas; simular a grade toda, mesmo fora da câmera |
@@ -413,3 +413,9 @@ As fontes abaixo apoiam **formas de equação/processo**; os números do cenári
 - A análise de atualização síncrona por Tan et al. (2021), já listada em [pesquisa](15_RESEARCH.md), informa o risco geral de causalidade em agentes; nossas regras de captura e commit são hipóteses que passam pelos testes deste documento.
 
 Não temos calibração climática local, observações de espécie, dados de forrageio, taxas de metabolismo de animais definidos nem cenário geográfico real. Para qualquer alegação L1/L2, escolher um processo, obter fonte/dados próprios, registrar ajuste e sensibilidade, e mudar apenas o contrato/marco correspondente.
+
+### Geografia v14 e renderização v18
+
+As seeds 1–3 avançaram até o tick 144 (dia 2), em 4096 células. Seed 1: elevação 18,1–170,2 m, 1079 células com água, 2556 grupos de gramínea e 1867 lenhosos; hash `F64D62792B9075EB7C85C33A11F9BACD2B542128F963C822E93C61A12BBF72AB`. Seed 2: 19,5–169,5 m, 1365 células com água, 2688 gramíneas e 2168 lenhosos; hash `4CFFA315B43A540BFB937AD03DBD5C96E4E22B5F6A730B2B6E3782031FFCD4F9`. Seed 3: 17,7–164,1 m, 1097 células com água, 2829 gramíneas e 2057 lenhosos; hash `BAFC8F9BF9932354ACA60839BB8E60A9C54633D27E6976EADFE21FB14706188F`. Resíduos máximos absolutos: `1.306×10⁻⁶ L` de água, `4.338×10⁻⁶ g` de matéria seca e `2.608×10⁻⁸ gN`. A suíte Release passou (19/19).
+
+Em Release, seed 1, 64 × 64 células, 1280 × 720, câmera ortográfica fixa e simulação a 6 ticks/s; aquecimento de 5 s e medição de 60 s. Resultado: 3538 quadros, média de 58.97 FPS, P95 de 17.26 ms, P99 de 45.64 ms, CPU de 59.2% de um núcleo e working set de 157.5 MiB. SHA256 de `Game.Client.Desktop.dll`: `B957FD099B091850687689060EC95F879EA5278BB86B8E375921ED8CFABF2E34`; de `Game.Modules.Geosphere.dll`: `C5D1FE168F19F4FEA599A2C2E2489EB9CDE5756FD59E43CB15A3768F725C1335`. Captura `genesis-flora-v18-mesorelief.png`, e o resultado bruto está em `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v18-release.txt`. A amostra ficou próxima de 59 FPS nesta máquina; não certifica desempenho em outros equipamentos.

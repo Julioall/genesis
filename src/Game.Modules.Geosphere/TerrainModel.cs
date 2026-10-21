@@ -109,6 +109,8 @@ public static class TerrainModel
         private readonly ValueNoise _broad;
         private readonly ValueNoise _regional;
         private readonly ValueNoise _detail;
+        private readonly ValueNoise _mesoRelief;
+        private readonly ValueNoise _microRelief;
         private readonly ValueNoise _ridgeMask;
         private readonly ValueNoise _mountainMask;
         private readonly ValueNoise _rimDetail;
@@ -121,6 +123,8 @@ public static class TerrainModel
             _broad = new ValueNoise(seed, 26, 0x5445525241494E31UL);
             _regional = new ValueNoise(seed, 12, 0x5445525241494E32UL);
             _detail = new ValueNoise(seed, 4, 0x5445525241494E33UL);
+            _mesoRelief = new ValueNoise(seed, 2, 0x4D45534F52454C46UL);
+            _microRelief = new ValueNoise(seed, 1, 0x4D4943524F524C46UL);
             _ridgeMask = new ValueNoise(seed, 10, 0x52494447454D4153UL);
             _mountainMask = new ValueNoise(seed, 8, 0x4D4F554E5441494EUL);
             _rimDetail = new ValueNoise(seed, 2, 0x504C415445415552UL);
@@ -215,6 +219,14 @@ public static class TerrainModel
             height -= 22 * valleyInfluence;
             height -= 8 * Math.Exp(-Math.Pow(valleyDistance / 2.6, 2));
             height += (y - 31.5) * 0.42; // the valley falls from the southern edge toward the north
+
+            // Small, continuous rock and soil undulations break the long smooth flanks. Keep them
+            // subdued in the wet valley floor so drainage remains legible; the renderer samples
+            // this same physical field at a finer resolution than the ecological grid.
+            var meso = _mesoRelief.Sample(x, y) * 2 - 1;
+            var micro = _microRelief.Sample(x, y) * 2 - 1;
+            var reliefMask = noiseFactor * (0.22 + 0.78 * SmoothStep(50, 112, height));
+            height += (meso * 4.8 + micro * 2.6) * reliefMask;
             return Math.Clamp(height, 8, 190);
         }
 

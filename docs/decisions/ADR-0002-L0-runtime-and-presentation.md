@@ -15,7 +15,7 @@ O contrato documental propõe uma implementação incremental em C#, com estado 
 - Gerar silhuetas e pixels por código em cache da sessão. Variações visuais são derivadas por uma função separada da seed ecológica. Sazonalidade de folhas é somente aparência; não representa estoque de folhas nem altera a simulação.
 - Rochas visuais são uma composição determinística baseada em elevação e variação visual; não representam estoque geológico L0, colisão nem recurso mineral.
 - Não incluir fauna, nem classes de fase futura. A documentação biológica permanece como intenção futura do roadmap.
-- Aplicar valores e unidades da ficha versionada `temperate-valley-l0-v13`.
+- Aplicar valores e unidades da ficha versionada `temperate-valley-l0-v14`.
 
 ## Alternativas consideradas
 

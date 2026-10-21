@@ -2,7 +2,7 @@
 
 ## Direção
 
-A câmera permanece ortográfica, fixa e inclinada o bastante para revelar faces e encostas. A altitude é dado físico da Geosfera; o cliente MonoGame amostra esse campo e o grava na coordenada vertical da malha. Textura e iluminação reforçam o relevo, mas não o substituem.
+A câmera permanece ortográfica e fixa, agora a cerca de 24° da vertical para enfatizar a leitura top-down sem esconder as faces. A altitude é dado físico da Geosfera; o cliente MonoGame amostra esse campo e o grava na coordenada vertical da malha. Textura e iluminação reforçam o relevo, mas não o substituem.
 
 As referências de Mapgen4 e do artigo Polygonal Map Generation orientam a separação entre feições geográficas, drenagem e biomas. Neste marco usamos curvas e campos de distância diretamente no sampler determinístico; não copiamos código, modelos ou imagens, nem incorporamos bibliotecas externas. Um grafo Voronoi/Delaunay pode ser avaliado quando o mapa deixar de ser uma grade pequena de simulação.
 
@@ -39,3 +39,10 @@ As referências de Mapgen4 e do artigo Polygonal Map Generation orientam a separ
 ## Limites desta etapa
 
 O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos por lado; não há LOD, streaming ou reconstrução seletiva. As cordilheiras têm encostas contínuas; três afloramentos possuem faces verticais explícitas. A drenagem usa o receptor D8 de maior declive e depressões locais, sem erosão que atualize o relevo, transporte de sedimentos ou chuva orográfica. O nível visual da água ainda aproxima a profundidade em vez de resolver uma superfície livre hidrostática. A flora usa faixas de altitude, inclinação e água determinísticas, não associações calibradas por espécie ou dados de campo.
+
+## Revisão geométrica v18 — relevo multiescala
+
+- O campo físico contínuo agora soma ruído determinístico de 20 m (até ±4,8 m) e 10 m (até ±2,6 m), moderado pela proximidade do vale e por uma máscara de altitude. Assim, as encostas ganham ondulação geométrica coerente sem transformar a planície inteira em terreno acidentado. O mesmo sampler continua alimentando células ecológicas, rede de drenagem e malha; os afloramentos mantêm suas coroas planas e paredes laterais explícitas.
+- Como essa alteração modifica elevação, drenagem e estado inicial, o identificador atual passa para `temperate-valley-l0-v14`. Os valores de amplitude são parâmetros artísticos/engenharia, não estimativas geológicas. A apresentação usa olho a 680 m na horizontal e 1500 m acima do centro; a projeção continua ortográfica.
+- A captura `genesis-flora-v18-mesorelief.png` está no diretório de visualizações do Codex, fora do repositório. A revisão mantém a silhueta de vale e cordilheiras, com ondulações adicionais visíveis nas encostas. Ainda faltam copas mais contínuas, bancos mais orgânicos e uma água menos larga para se aproximar da referência.
+- Em Release, seeds 1–3 foram avançadas até tick 144; os hashes, populações, intervalos de elevação, resíduos de balanço e benchmark atualizados estão em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md). A suíte completa passou com 19 testes.

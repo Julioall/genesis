@@ -34,6 +34,12 @@
 
 As correções de reprodução, composição de N e transações são requisitos de consistência dos estoques escolhidos, não reprodução integral da fisiologia real nem validação experimental.
 
+## Geografia procedural e apresentação 2.5D (consulta de 21/10/2026)
+
+- Amit Patel, [Polygonal Map Generation for Games](https://theory.stanford.edu/~amitp/game-programming/polygon-map-generation/), atualizado em 2025: separa restrições de jogo/geografia (por exemplo, elevação e fluxo) de variação menos restrita por ruído. O próprio exemplo prioriza ilhas e montanhas afastadas da costa, uma premissa que não adotamos; aqui as cordilheiras são interiores e enquadram um vale.
+- Red Blob Games, [Mapgen4](https://www.redblobgames.com/maps/mapgen4/) e [código-fonte](https://github.com/redblobgames/mapgen4): explora a edição de montanhas, vales e oceanos antes de derivar chuva, rios e biomas, além de uma projeção 3D estilizada. Isso é referência de fluxo e apresentação, não código, arte incorporada ou validação física de nosso gerador.
+- A revisão v14 aplica variação coerente em escalas de 20 m e 10 m ao mesmo campo de altitude usado pela Geosfera, drenagem e colocação inicial de flora. Amplitudes de engenharia são atenuadas perto do vale e em cotas baixas; não foram calibradas com dados geomorfológicos. A malha continua sendo uma representação visual mais densa do campo físico, não uma simulação de erosão.
+
 ## Conferência pontual da segunda leitura
 
 Em 20/10/2026 foram confirmados título/autoria/ano e pertinência geral das seguintes referências em fontes primárias:

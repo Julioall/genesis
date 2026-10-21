@@ -1402,8 +1402,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void UpdateCamera()
     {
         var target = new Vector3(TerrainExtentM * 0.5f, (float)_centerElevationM, TerrainExtentM * 0.5f);
-        var horizontal = 1000f;
-        var elevation = 1400f;
+        var horizontal = 680f;
+        var elevation = 1500f;
         var eye = target + new Vector3(0, elevation, horizontal);
         _view = Matrix.CreateLookAt(eye, target, Vector3.Up);
         var viewHeight = 550f;
