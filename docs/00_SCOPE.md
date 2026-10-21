@@ -4,7 +4,7 @@
 
 Mundo vivo e emergente: atmosfera muda a oferta de água e calor; superfície redistribui água; solo regula reservas e nutrição; plantas crescem, disputam luz, água e nutrientes; animais consomem biomassa e outros animais; organismos deixam detritos e os decompositores devolvem nutrientes. A observação do jogo explica **por que** um evento ocorreu, não só que ocorreu.
 
-O mundo é 2D **top-down**, pixel art procedural, atualização separada entre simulação e gráficos, mapa maior que a janela visível por chunks ou regiões. Não exigir simulação molecular ou fidelidade climatológica de pesquisa.
+O mundo precisa ser natural, procedural e observável, com apresentação capaz de comunicar relevo, volume, água, vegetação, rocha e profundidade. A stack do cliente é C#/.NET com MonoGame; 2D, composição híbrida e 3D estilizado são técnicas elegíveis dentro dela. Não há exigência de pixel art, câmera top-down fixa, sprites ou tiles. A simulação permanece separada da apresentação, e o mapa pode ser maior que a área visível por regiões/chunks visuais. Não exigir simulação molecular ou fidelidade climatológica de pesquisa. Consulte [direção visual e técnicas de apresentação](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md).
 
 ## Incluir na primeira entrega funcional
 
@@ -15,7 +15,7 @@ O mundo é 2D **top-down**, pixel art procedural, atualização separada entre s
 | Geosphere | relevo, declive, substrato, 2+ solos, água no solo, nutriente N agregado, matéria orgânica | tectônica, geologia profunda, geoquímica completa |
 | Hydrosphere | água superficial em lâmina, infiltração, escoamento local, depressões e saídas de borda, evaporação | canais/rios persistentes, oceanografia, transporte químico detalhado, aquíferos completos, gelo dinâmico |
 | Biosphere | gramíneas+árvores ou arbustos; herbívoros+predadores; detritos/decomposição agregada; reprodução e morte | IA neural, genética populacional avançada, doenças complexas, dezenas de espécies |
-| Cliente | top-down, geração visual por código, layers, inspeção, pausa, aceleração, seed, save/load | animação cinematográfica, editor avançado, online |
+| Cliente | representação visual procedural, legibilidade dos estados, layers de diagnóstico, inspeção, pausa, aceleração, seed, save/load | animação cinematográfica, editor avançado, online |
 
 ## Critérios observáveis para dizer “mundo vivo”
 
@@ -33,7 +33,7 @@ No L0, uma grade ambiental comum, plantas por patches por célula/grupo e animai
 
 ## Não objetivos explícitos
 
-Nenhum humano/civilização, exploração espacial, economia, política, física 3D completa, precipitação com microfísica de nuvens, oceanos globais, genética molecular ou ecologia exaustiva. Tudo isso pode ser objeto de fases futuras **sem obrigar a definir contratos gigantes hoje**.
+Nenhum humano/civilização, exploração espacial, economia, política, obrigação de simular toda a física em 3D, precipitação com microfísica de nuvens, oceanos globais, genética molecular ou ecologia exaustiva. A possibilidade de uma apresentação 3D não obriga todos os processos a usar uma simulação volumétrica. Esses aprofundamentos científicos podem ser objeto de fases futuras **sem obrigar a definir contratos gigantes hoje**.
 
 ## Limites operacionais do primeiro cenário
 

@@ -1,29 +1,30 @@
-# Procedural-only, top-down e desempenho
+# Mundo procedural, apresentação visual e desempenho
 
 As metas numéricas de desempenho e o cenário de medição L0 constam em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md); este documento não cria limites alternativos.
 
 ## Regra de produto
 
-Todos os conteúdos visuais/sonoros necessários para executar o mundo serão gerados **por receitas, parâmetros e algoritmos** mantidos pelo projeto. Isso não significa proibir MonoGame/.NET, dependências técnicas ou cache de texturas geradas em RAM/disco. Não exigir packs de PNG, spritesheets, fontes desenhadas à mão ou WAV externos para iniciar o mundo.
+O mundo físico, a simulação e os recursos visuais de runtime devem ser reproduzíveis por seed. Árvores, rochas, gramíneas, superfícies e detalhes são desenhados por receitas em código e cacheados em memória. O cliente não depende de pacotes externos de imagens, modelos ou texturas artísticas.
 
 ## Etapas independentes
 
 1. **Genesis procedural do mundo físico** por seed: elevação → drenagem → substrato → parâmetros de solo → habitats iniciais e reservatórios.
 2. **Estado vivo** por tick: água, temperatura, biomassa, detritos, população, mortalidade; nunca depender do desenho.
-3. **Receitas de aparência**: espécies funcionais → geração de tronco/copa/folhas, grama, solo, pedras, silhuetas animais e animações.
-4. **Render L0**: gerar/carregar silhuetas em cache, compor cena por chunks visuais, animações simples e UI/inspeção; atlas e LOD são otimizações posteriores.
+3. **Receitas de aparência**: espécies funcionais → geração procedural de tronco/copa/folhas, grama, solo, pedras, silhuetas animais e animações.
+4. **Render L0**: gerar e cachear receitas, compor cena por chunks visuais, animações simples e UI/inspeção; LOD é evolução posterior.
 
 O termo 'genesis' da etapa 1 descreve o processo de origem do mundo e **não autoriza** uso de `Genesis` como nome de projeto, pasta ou namespace.
 
 ## Princípios visuais
 
-- Top-down 2D, com ilusão visual 2.5D apenas nas alturas/sombras. Não inclinar recursos arbitrariamente; manter âncoras/posições coerentes com perspectiva de topo.
-- Pixel art legível; anti-alias/desfoque não devem adulterar paleta e pixels lógicos.
+- A câmera, projeção e dimensionalidade da representação serão escolhidas após a validação visual comparativa. A direção deve comunicar profundidade, volume, relevo, água, rocha e vegetação; requisitos completos estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md).
+- O cliente ancora todo objeto às coordenadas e à elevação física publicadas. Malhas, sprites, billboards ou técnicas híbridas são escolhas do renderer e não decidem geografia nem estado biológico.
+- Não há obrigação de pixel art, anti-aliasing específico, ortografia, perspectiva ou câmera fixa. A qualidade será avaliada por leitura e integração natural, sem limitar a técnica de antemão.
 - Mundo finito gerado antes do avanço; chunks visuais podem gerar recursos sob demanda para mostrar uma área maior que a tela. `seed` global estável, seeds locais derivadas por chunk, entidade, receita e versão.
 - Arbustos/árvores: parâmetros botânicos afetam morfologia procedural mas não implicam uma folha como entidade persistente.
 - Fora da tela, render desligado e simulação ativa. LOD visual detalhado é evolução posterior; não há LOD de simulação no MVP.
 - Não regenerar geometria completa de todas as árvores por quadro de vento. Cache inicial por receita, versão, grupo e estágio; adicionar estação/LOD e animação hierárquica apenas quando usados e medidos.
-- Recursos do renderer, `Texture2D`, `SpriteBatch`, shaders e eventos de input não entram em `Game.Modules.*`.
+- Recursos e APIs do renderer, shaders e eventos de input não entram em `Game.Modules.*`; sua tecnologia fica isolada no cliente/adaptador.
 
 ## Procedural e biologia não devem divergir
 
@@ -42,4 +43,4 @@ Se for necessário usar uma fonte incorporada, registrar uma exceção explícit
 
 ## Corte visual inicial
 
-Usar silhuetas procedurais legíveis e cacheadas por grupo/estágio, terreno em chunks visuais e UI de inspeção simples. Galhos detalhados, animação hierárquica, múltiplos LODs, pools e atlas avançados só após necessidade medida. A câmera recorta renderização; todo o mapa finito continua simulado. Não exigir geração infinita nem suspensão biológica fora da tela.
+Usar silhuetas procedurais cacheadas por grupo/estágio, malha de terreno em buffers persistentes e UI de inspeção simples. A malha de água segue as faixas D8 e as áreas alagadas do snapshot. Chunks e LOD são otimizações posteriores. A câmera recorta renderização; todo o mapa finito continua simulado. Não exigir geração infinita nem suspensão biológica fora da tela.

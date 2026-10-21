@@ -30,7 +30,7 @@ Cada teste registra `build`, `worldSeed`, `scenarioVersion`, parâmetros complet
 | T14 | matéria orgânica nova em Soil | consumidor apenas hídrico segue funcionando |
 | T15 | substituição de Soil por outra implementação | não exige editar Atmosphere, Biosphere, Hydrosphere |
 | T16 | salvar/recarregar e seguir | mesma continuação, incluindo RNG, agendas e seres vivos |
-| T17 | render ligado/desligado, zoom e movimento de câmera | estado lógico idêntico no ambiente testado |
+| T17 | render ligado/desligado, projeção, zoom, câmera e carregamento de chunks visuais | estado lógico idêntico; apresentação não consome RNG ecológico nem altera estado |
 | T18 | cenário integrado 2 habitats / 2 plantas / 2 animais | cadeia ambiental e biológica observável por múltiplos ciclos |
 
 ## Regras de aprovação
@@ -54,10 +54,18 @@ Cada teste registra `build`, `worldSeed`, `scenarioVersion`, parâmetros complet
 | T24 | cadências diferentes e chuva horária | cada janela de fluxo é consumida uma vez; save preserva próxima execução |
 | T25 | escala espacial, movimento e estado inválido | mm × área converte para litros; velocidade respeita distância/tempo; NaN/Infinity rejeitados |
 
-Esses são critérios para a implementação futura. Na revisão documental só se verificam coerência, referências locais e cobertura de requisitos; não declarar esses experimentos executados sem runtime.
+Esses são critérios para a implementação futura. Na revisão documental de 20/10/2026 só se verificaram coerência, referências locais e cobertura de requisitos; os resultados efetivamente executados depois estão registrados na seção abaixo.
 
 ## Aplicação incremental dos gates
 
 N0 verifica boot, pausa, dependências e determinismo do estado mínimo. N1 exercita T01–T06, a parte hídrica de T16/T22/T24/T25 e contratos utilizados. N2 adiciona T07–T08, T12, T19 vegetal e T23; N3 adiciona T09–T11, T19 animal, T20–T21. T13–T15 usam fixtures pequenas à medida que os contratos existem. N4 reúne T01–T25, incluindo T17–T18 e medições gráficas. Nenhum marco inicial exige implementar os sistemas dos marcos seguintes para executar testes que ainda não se aplicam.
 
 No cenário integrado T18, declarar antes da execução duração, ticks, seeds, estoques iniciais e quais elos causais devem ser observados. A duração deve permitir demonstrar crescimento, consumo, morte e reciclagem, com reprodução verificada nos cenários próprios. Extinção explicada pode passar; uma população que desaparece antes de exercitar a cadeia torna essa demonstração inconclusiva, sem autorizar respawn corretivo.
+
+## Evidência executada nesta branch
+
+O escopo implementado é N0–N2, sem fauna. `dotnet build Game.sln -c Release` compila runner, módulos, cliente DesktopGL e testes. `dotnet test Game.sln -c Release` cobre o vetor RNG L0, repetibilidade e partição de ticks, snapshot imutável, geometria solar, chuva/solo saturado, escoamento D8, crescimento limitado por luz/água/N, decomposição e conservação de massa/N, continuação após save/load no meio do dia e cadência diária. Os casos futuros T09–T11 e a parte animal de T19–T21 permanecem fora do escopo e não foram executados.
+
+Smoke runs adicionais avançaram seeds 1, 2 e 3 por 52.560 ticks cada. Isso evidencia execução longa e terminações finitas para essas seeds; não substitui a instrumentação completa de T01–T25 nem validação de campo. Os 19 testes Release também cobrem a variação real de elevação na malha, a continuidade de bordas entre chunks, a geometria dos afloramentos, a drenagem e a distribuição determinística de flora. Na revisão ecológica v13, seeds 1–3 avançaram até o tick 144 e fecharam água, matéria seca e N dentro das tolerâncias registradas em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
+
+A build Release do cliente foi aberta e respondeu com o título `ASTERRA - Temperate Valley (L0)`. A captura `genesis-flora-v17-highland-forest.png` e a medição de 60 s estão fora do repositório no diretório de visualizações do Codex; seed 1, 1280 × 720, aquecimento de 5 s: 3541 quadros, média 59.02 FPS, P95 17.20 ms, P99 45.80 ms, CPU 58.2% de um núcleo e working set 181.5 MiB. A imagem mostra a geometria e os bosques ampliados, mas ainda não alcança a densidade vegetal nem as margens de rio da referência.

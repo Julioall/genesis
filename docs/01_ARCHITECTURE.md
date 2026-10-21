@@ -71,6 +71,12 @@ Os diretórios de submódulo são **internos** ao assembly de domínio; não cri
 - **Module:** estados/algoritmos pertencentes a um grande domínio; seus submódulos podem colaborar internamente.
 - **Client:** representação e controles; não participa da verdade simulada.
 
+### Fronteira da apresentação
+
+O cliente MonoGame recebe snapshots e converte seus campos em malhas, instâncias, texturas, materiais, partículas ou outras formas visuais. O modelo de dados de apresentação não vira owner de relevo, água ou organismos. A simulação pode manter grades e cadências próprias mesmo quando a apresentação usa geometria tridimensional, interpolação ou níveis de detalhe.
+
+Isolar dependências específicas de MonoGame no cliente gráfico. O core, os módulos, testes científicos, determinismo, save/load e runner headless não referenciam API gráfica, câmera, FPS, GPU ou carregamento visual. Atualizações de apresentação não alteram parâmetros L0 nem estado do mundo.
+
 ## Critério para divisão
 
 Criar projeto C# próprio só se houver forte necessidade de versionamento, ciclos separados, testes isolados, ownership independente ou reuso fora do domínio. Normalmente `Botany/Trees` e `Botany/Grass` são estratégias/receitas dentro de `Game.Modules.Biosphere`, não DLLs independentes.

@@ -14,7 +14,7 @@ Abaixo estão **níveis L0**, suficientes para iniciar uma simulação causal. N
 | Estoque superficial | água antes, precipitação líquida, escoamentos | água em lâmina mm ou m³/célula | Hydrosphere | capacidade/borda explícitas; poças podem secar |
 | Infiltração | incidente, capacidade hidráulica, saturação | água efetiva aceita pelo solo e remanescente superficial | Geosphere.Soil | fórmula de capacidade L0, negociada com Hydro |
 | Água retida/evaporada | água solo, demanda evaporativa, cobertura | solo mm e perdas | Geosphere.Soil | remover apenas concedido; água não é umidade relativa |
-| Rio/lago | topografia, água, fluxos | rede/volume/drenagem | Hydrosphere | capacidade futura; o cenário quantitativo L0 usa poças/depressões e saída de borda, sem canal persistente |
+| Rio/lago | topografia, água, fluxos | rede/volume/drenagem | Hydrosphere | canais D8, água inicial em trechos/depressões e descarga finita de aquífero; sem recarga subterrânea, erosão ou vazão perene ilimitada |
 | Nitrogênio no solo | estoque mineral, retirada vegetal, mineralização | g N/m² | Geosphere.Soil | N agregado, não N/P/K completo no MVP |
 | Matéria orgânica edáfica | detritos transferidos/decomposição | g matéria seca/m² | Geosphere.Soil | transação de Ecology; não materializar nutrientes gratuitamente |
 
@@ -30,7 +30,7 @@ Abaixo estão **níveis L0**, suficientes para iniciar uma simulação causal. N
 
 1. Pressão atmosférica dinâmica e vento fluidodinâmico 3D.
 2. Neve/gelo hidrológicos: documentar a intenção de `ISnowPack`, sem interface executável no L0; entrada da Atmosphere e estado em Hydrosphere.
-3. Groundwater/Aquifer: compatibilidade futura entre Soil/Hydrosphere sem criar dois owners.
+3. Recarga dinâmica de aquífero e troca profunda entre Soil/Hydrosphere, sem criar dois owners.
 4. Erosão e sedimentos conservativos: trilha científica futura após teste hídrico robusto.
 5. Fosfato, potássio, microbioma, geoquímica detalhada e água de qualidade.
 6. Marés, oceanos globais, tectonismo ativo e ciclos astronômicos complexos.

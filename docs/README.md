@@ -25,6 +25,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Testes e gates](13_TESTS.md)
 - [Viabilidade de navegador](14_WEB_GATE.md)
 - [Pesquisa científica](15_RESEARCH.md)
+- [Síntese visual procedural do Consensus](research/consensus-procedural-flora.md)
 - [Legado e reutilização](16_LEGACY.md)
 - [Templates técnicos](17_TEMPLATES.md)
 
@@ -40,3 +41,5 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Resultado da revisão e limites do parecer](18_DOCUMENT_REVIEW.md)
 - [Regras de codificação](19_CODING_RULES.md)
 - [Modelos L0, equações, parâmetros e metas](20_L0_MODEL_AND_BENCHMARKS.md)
+- [Terreno geométrico e protótipo atual](21_GEOMETRIC_TERRAIN.md)
+- [Direção visual e técnicas de apresentação no MonoGame](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md)
