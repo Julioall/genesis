@@ -15,10 +15,12 @@
 8. Prusinkiewicz, P. & Lindenmayer, A. (1990). **The Algorithmic Beauty of Plants.** Livro de referência de modelos de ramificação procedurais, não validação fisiológica automática de qualquer planta de jogo. https://algorithmicbotany.org/papers/#abop
 9. FAO-56, Allen et al. (1998). **Crop Evapotranspiration — Guidelines for Computing Crop Water Requirements.** https://www.fao.org/4/x0490e/x0490e00.htm — referência para possível fase L1 de evapotranspiração; não obrigatória no modelo L0.
 
-## Engine e plataforma
+## Stack MonoGame e plataforma
 
-10. MonoGame, **Supported Platforms**: https://docs.monogame.net/articles/getting_started/platforms.html
-11. MonoGame, **New Web Platform #9515**: https://github.com/MonoGame/MonoGame/issues/9515
+MonoGame é a stack obrigatória do cliente. Estas fontes registram capacidades e limites relevantes para implementação e distribuição; a avaliação visual compara técnicas dentro do MonoGame, conforme [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md).
+
+10. MonoGame, [visão geral e modelo de framework](https://docs.monogame.net/articles/tutorials/building_2d_games/01_what_is_monogame/index.html): framework C#/.NET com ferramentas de apresentação construídas pelo projeto.
+11. MonoGame, [Supported Platforms](https://docs.monogame.net/articles/getting_started/platforms.html), [renderização 3D](https://docs.monogame.net/articles/getting_to_know/whatis/graphics/WhatIs_3DRendering.html), [licença](https://github.com/MonoGame/MonoGame/blob/develop/LICENSE.txt) e [proposta de plataforma web #9515](https://github.com/MonoGame/MonoGame/issues/9515): issue/roadmap não demonstram compatibilidade do produto.
 
 ## Instruções ao Codex sobre referências
 
@@ -30,11 +32,13 @@
 ## Complemento consultado na revisão documental de 20/10/2026
 
 - FAO, [Optimizing Nitrogen use on the farm](https://www.fao.org/4/y5146e/y5146e09.htm): apoia a interação entre disponibilidade hídrica, N e crescimento e a mineralização do N orgânico. Trata de culturas agrícolas; não fornece coeficientes calibrados para os perfis ecológicos fictícios deste MVP.
-- Na revisão documental de 20/10/2026, as fontes MonoGame acima foram consultadas para separar plataforma oficialmente listada de trabalho em andamento. Uma issue aberta ou roadmap não demonstrava compatibilidade do jogo; o cliente MonoGame mínimo foi implementado depois, nesta branch, sem certificação multiplataforma.
+- Na revisão documental de 20/10/2026, as fontes MonoGame acima foram consultadas para separar plataforma oficialmente listada de trabalho em andamento. Uma issue aberta ou roadmap não demonstra compatibilidade do jogo; cada alvo precisa de validação própria.
 
 As correções de reprodução, composição de N e transações são requisitos de consistência dos estoques escolhidos, não reprodução integral da fisiologia real nem validação experimental.
 
-## Geografia procedural e apresentação 2.5D (consulta de 21/10/2026)
+## Geografia procedural e apresentação do protótipo atual (consulta de 21/10/2026)
+
+As observações abaixo registram pesquisa e decisões usadas no protótipo geométrico então existente. Elas não tornam 2.5D, top-down ou projeção ortográfica requisitos vigentes. MonoGame permanece a stack; a referência visual e a comparação de técnicas dentro dela estão no documento 22.
 
 - Amit Patel, [Polygonal Map Generation for Games](https://theory.stanford.edu/~amitp/game-programming/polygon-map-generation/), atualizado em 2025: separa restrições de jogo/geografia (por exemplo, elevação e fluxo) de variação menos restrita por ruído. O próprio exemplo prioriza ilhas e montanhas afastadas da costa, uma premissa que não adotamos; aqui as cordilheiras são interiores e enquadram um vale.
 - Red Blob Games, [Mapgen4](https://www.redblobgames.com/maps/mapgen4/) e [código-fonte](https://github.com/redblobgames/mapgen4): explora a edição de montanhas, vales e oceanos antes de derivar chuva, rios e biomas, além de uma projeção 3D estilizada. Isso é referência de fluxo e apresentação, não código, arte incorporada ou validação física de nosso gerador.
@@ -47,7 +51,7 @@ As correções de reprodução, composição de N e transações são requisitos
 - Schott et al. (2023), [Large-scale Terrain Authoring through Interactive Erosion Simulation](https://doi.org/10.1145/3592787), *ACM Transactions on Graphics* 42. Usa domínio de soerguimento e roteamento de fluxo para permitir cristas e vales controláveis com consistência hidrológica. É referência para acoplar feições estruturais ao relevo antes de extrair a rede D8.
 - Teoh (2009), [RiverLand: An Efficient Procedural Modeling System for Creating Realistic-Looking Terrains](https://doi.org/10.1007/978-3-642-10331-5_44), *International Symposium on Visual Computing*. Constrói o terreno a partir de redes hidrográficas e conecta bacias, montanhas e falésias sem simulação fluida complexa.
 - SciSpace localizou essas linhas de trabalho; uma busca pontual no Consensus recuperou os três artigos sobre soerguimento e erosão acima. A inferência de implementação para este mundo de 64 × 64 células é gerar eixos de crista determinísticos independentes do meandro, ramificá-los em cristas secundárias mais baixas e continuar calculando a drenagem a partir da altitude resultante. Amplitudes e larguras serão parâmetros de engenharia, não valores geológicos observados. Não será alegada erosão, calibração ou validação geomorfológica.
-- O Game Studio skill foi revisto nesta etapa. Ele roteia jogos de navegador para Phaser/Three.js; essas rotas não se aplicam ao projeto existente em C#/MonoGame.
+- A anotação anterior sobre roteamento de Game Studio refletia um estudo técnico histórico; não altera a stack MonoGame fixada para o projeto.
 
 ## Conferência pontual da segunda leitura
 
@@ -72,11 +76,17 @@ Consultas feitas no SciSpace e uma síntese de literatura no Consensus foram usa
 - Li et al. (2021), [Learning to reconstruct botanical trees from single images](https://doi.org/10.1145/3478513.3480525), *ACM Transactions on Graphics*. A reconstrução usa volumes radiais de copa inferidos de imagens; depende de dados/imagens e não é requisito para geração por regras do L0.
 - Blaise, Barczi & Jaeger (1998), [Simulation of the growth of plants: modeling of metamorphosis and spatial interactions in the architecture and development of plants](https://doi.org/10.1007/978-4-431-67941-7_6). Descreve eixos de referência, eventos discretos e interações espaciais/ambientais; é uma alternativa de maior custo que não adotamos para o patch agregado.
 
-**Decisão artística para o cliente mínimo:** gerar terreno, rochas, gramíneas, estrutura lenhosa e pequenas massas de folhas por código; quantizar pixels e cachear texturas por receita/variante visual/estação. A seed visual é derivada separadamente e nunca entra em fluxos ecológicos. A camada de folhas pode mudar aparência sazonal a partir do calendário, mas não cria folhas como estoque, nem muda biomassa, cobertura, água ou N. Silhuetas, cores de estação, agrupamento de rochas e densidade de pixels são escolhas de legibilidade, não inferências botânicas ou geológicas.
+Como referências de implementação, foram estudados [EZ-Tree](https://github.com/dgreenheck/ez-tree), [MTree/GoodPie](https://github.com/GoodPie/modular_tree), [Space Colonization](https://github.com/jakobrichert/space-colonization), [SeedThree](https://github.com/SkyeShark/SeedThree) e [Unity Space Colonization](https://github.com/jasonwebb/unity-space-colonization). Eles demonstram técnicas de geração, não validam a biologia nem os coeficientes do Gênesis. A comparação inicial de algoritmos está em [iteração 43](reports/PROCEDURAL_TREE_REPOSITORY_RESEARCH_ITERATION_43_2026-10-22.md), a aplicação de regras de galho em [iteração 47](reports/PROCEDURAL_TREE_BRANCH_SHAPE_ITERATION_47_2026-10-22.md) e o estudo da estabilidade entre LODs em [iteração 48](reports/PROCEDURAL_TREE_LOD_SCAFFOLD_ITERATION_48_2026-10-22.md). Nenhum código, asset ou dependência desses projetos foi incorporado.
+
+### Histórico de decisões para o cliente pixel-art anterior
+
+As notas a seguir descrevem o cliente mínimo e a referência visual usados antes da revisão 2.7. A geração procedural por seed e a separação de arte e simulação continuam válidas; quantização de pixels e cache de texturas são escolhas históricas, não requisitos. A mudança v13 de densidade de cobertura também é um registro histórico do cenário; nenhum parâmetro foi alterado nesta revisão visual.
+
+**Decisão artística histórica:** gerar terreno, rochas, gramíneas, estrutura lenhosa e pequenas massas de folhas por código; quantizar pixels e cachear texturas por receita/variante visual/estação. A seed visual é derivada separadamente e nunca entra em fluxos ecológicos. A camada de folhas pode mudar aparência sazonal a partir do calendário, mas não cria folhas como estoque, nem muda biomassa, cobertura, água ou N. Silhuetas, cores de estação, agrupamento de rochas e densidade de pixels eram escolhas de legibilidade, não inferências botânicas ou geológicas.
 
 **Ajuste do cenário de cobertura v13:** para aproximar os bosques visíveis das encostas da referência, a colocação lenhosa inicial passou de 27%/40%/12% para 30%/62%/40% nas faixas de altitude L0 e o limite heurístico de inclinação passou de 0.70 para 1.0 m/m; a exclusão de células alagadas foi mantida. Essas frações alteram o estado inicial e, por isso, a versão do cenário foi incrementada. São uma escolha de densidade para o jogo, não estimativa ecológica, calibração de campo ou resultado dos estudos abaixo. Biomassa, crescimento, senescência e decomposição continuam conforme a ficha L0.
 
-**Referência de implementação:** o Game Studio skill foi consultado como guia de organização de loop, superfícies de apresentação, pipeline visual e validação. Suas rotas padrão web/Phaser não se aplicam aqui: o contrato do projeto e a solicitação desta etapa fixam C# e MonoGame. O cliente será um adaptador sobre snapshots; a simulação continuará headless e não dependerá de MonoGame.
+**Registro de implementação anterior:** o Game Studio skill foi consultado como guia de organização de loop, superfícies de apresentação, pipeline visual e validação. As notas abaixo registram a composição MonoGame do protótipo existente. A revisão atual fixa MonoGame e mantém em avaliação apenas a técnica de apresentação; a simulação continua headless e independente do cliente gráfico.
 
 - MonoGame, [Supported Platforms](https://docs.monogame.net/articles/getting_started/platforms.html): a documentação lista DesktopGL para Windows/macOS/Linux. A escolha de `MonoGame.Framework.DesktopGL` é de compatibilidade do cliente, não uma promessa de navegador.
 - MonoGame, [Texture Sampling and Tiling Backgrounds](https://docs.monogame.net/articles/tutorials/building_2d_games/18_texture_sampling/index.html): `PointClamp` preserva pixels nítidos em texturas ampliadas; é uma decisão de renderização, sem consequência para o estado do mundo.
@@ -93,17 +103,19 @@ SciSpace foi usado para localizar trabalhos sobre balanço diário de água/radi
 
 Essas fontes apoiam escolhas de forma e não testam coeficientes, perfis animais, chuva sintética ou tolerâncias do cenário `temperate-valley-l0-v13`.
 
-## Revisão visual da referência de paisagem (21/10/2026)
+## Revisão visual da referência anterior de paisagem (21/10/2026)
 
-A imagem enviada como alvo mostra um recorte panorâmico de vale em pixel art: terreno contínuo sem contornos de célula, grupos irregulares de coníferas e árvores de folhas largas, afloramentos, cobertura baixa e água com margens sinuosas. Essa composição é uma referência artística, não evidência sobre o relevo ou a flora do cenário L0.
+Esta seção documenta uma imagem analisada antes da revisão 2.7 e não corresponde às duas novas imagens de referência, arquivadas em `docs/references/visual-direction/`. A descrição de pixel art abaixo é histórica; a direção vigente e os critérios de validação estão em `docs/22_VISUAL_DIRECTION_AND_TECHNOLOGY.md`. Nenhuma imagem é dado científico ou asset do runtime.
+
+A imagem anterior mostrava um recorte panorâmico de vale com terreno contínuo sem contornos de célula, grupos irregulares de coníferas e árvores de folhas largas, afloramentos, cobertura baixa e água com margens sinuosas. Essa composição era uma referência artística, não evidência sobre o relevo ou a flora do cenário L0.
 
 - A apresentação MonoGame usa uma transformação oblíqua suave da superfície e mantém os sprites de plantas na tela, com ordenação pelo eixo de profundidade projetado. O relevo físico continua vindo de `TerrainModel`; a transformação não cria degraus, voxels ou elevação nova.
 - A projeção agora centraliza as 64 × 64 células na janela de 1600 × 900. O painel lateral virou um HUD curto no canto, com inspeção perto do cursor; `H` oculta a interface para comparar a paisagem diretamente com a referência.
 - A paleta do solo usa interpolação bilinear, ruído visual determinístico em mais de uma escala e sombreamento derivado da elevação. A inspiração para a suavização regional 5×5 e o hillshade veio da leitura do renderer em `Spectators-of-Life`; esse checkout foi consultado somente para leitura. Os coeficientes desta implementação são artísticos e não substituem a topografia L0.
-- As copas são texturas C# de 64 × 64 pixels: coníferas têm camadas de ramos em 12 níveis; caducifólias usam 18 ramos de comprimentos variados e massas de folhas sobrepostas, com tronco curvo, lacunas e cores sazonais. A estrutura visual foi orientada pelos exemplos de `asterra-trees`/`asterra-leaves`, sem incluir imagens ou dependência JavaScript no runtime MonoGame.
+- As copas eram texturas C# de 64 × 64 pixels: coníferas tinham camadas de ramos em 12 níveis; caducifólias usavam massas de folhas sobrepostas, com tronco curvo, lacunas e uma paleta sazonal. A estrutura visual foi orientada por bibliotecas de referência para árvores e folhas, sem incluir imagens ou dependência JavaScript no runtime MonoGame. **A paleta sazonal foi removida na revisão de 21/10/2026**; a política vigente exige traço de espécie e estado causal antes de exibir pigmento sazonal.
 - A cobertura de grama é suavizada para formar manchas e limitada às células que têm biomassa de grama no snapshot. O autotile agora usa uma grade 4 × 4 de subcélulas, ruído em duas escalas e máscaras de oito vizinhos para recortar cantos; tufos e flores continuam sendo detalhes de desenho.
 - As rochas recebem silhuetas facetadas e detritos por uma regra de colocação visual baseada na elevação. As probabilidades e paletas são heurísticas de apresentação; não representam litologia ou estoque geológico simulado.
-- `V` percorre quatro paletas sazonais de apresentação, começando no verão para permitir observar a copa cheia. O HUD separa `ART` de `SIM`: essa prévia muda as cores do terreno e das folhas, sem alterar calendário, biomassa, água, nitrogênio ou aleatoriedade ecológica.
+- O controle `V` e o HUD `ART/SIM` existiam na implementação histórica para percorrer quatro paletas de apresentação. Foram removidos na revisão de 21/10/2026: estação exibida agora vem do snapshot, sem prévia de cores que não estejam apoiadas em traços e estados biológicos.
 
 Esta passada ainda não reproduz o alvo completo: o cenário inicial pode ter pouca água superficial, a grade L0 tem resolução limitada e a imagem gerada ainda depende da distribuição de plantas existente no snapshot. Não se desenha um rio sem estado de água que o sustente, nem se aumenta a população para preencher a cena. Esses limites precisam ser considerados em qualquer nova evolução visual.
 
@@ -132,3 +144,74 @@ Uma busca semântica no SciSpace localizou os estudos abaixo. Eles ajudam a just
 - Mu et al. (2026), [Spatial Diagnosis of Climatic and Landscape Controls on Forest Leaf Area Index Across China](https://doi.org/10.3390/f17020203): integra LAI, clima, topografia e estrutura de paisagem com SHAP, GeoDetector e diagnósticos não lineares; o resumo destaca regimes regionais distintos e saturação de precipitação. O resumo consultado não explicita incertezas/limitações do método e a geografia observada é China continental; não permite inferir causalidade ou coeficientes para o jogo.
 
 Esses resultados apoiam usar campos ambientais e mais de uma escala espacial para variar colocação e forma. A próxima revisão de flora pode expor aspecto/insolação, umidade do solo e substrato como fatores visuais explicitamente derivados do snapshot; até isso existir e ser testado, a distribuição atual depende somente dos fatores documentados no código. A síntese anterior do Consensus, com métodos de geração de árvores e limites de L-systems/space-colonization, permanece em [consensus-procedural-flora.md](research/consensus-procedural-flora.md). Uma tentativa de nova consulta Consensus nesta rodada não foi aceita porque a conta informou apenas um crédito restante e exigiu plano Pro; nenhum resultado novo do Consensus foi usado.
+
+## Alometria de altura e copa em povoamentos mistos (SciSpace, 21/10/2026)
+
+Uma busca no SciSpace sobre altura, competição e dimensão de copa encontrou estudos com árvores medidas individualmente. Eles apoiam variar arquiteturas por espécie e considerar competição e sítio, mas não fornecem coeficientes aplicáveis diretamente ao Genesis:
+
+- Savine, Cordonnier e Ligot (2025), [Robust height-diameter allometries for 42 European tree species: stand characteristics and structure matter](https://doi.org/10.1101/2025.09.29.679156), usa 269.976 observações de altura em 49.234 parcelas para 42 espécies. Área basal, diâmetro quadrático médio e estrutura do povoamento afetam as relações altura-diâmetro; para várias espécies, competição maior corresponde a árvores mais altas para um mesmo diâmetro. É um preprint.
+- Esfahani, Meng e Wong (2025), [Species-specific modeling of tree diameter at breast height using tree height and relative density](https://doi.org/10.1016/j.foreco.2025.123372), usa 1.807 árvores em 653 parcelas de floresta temperada mista. Modelos específicos por espécie melhoram ao incluir densidade relativa como índice de competição; a qualidade varia entre grupos de espécies.
+- Buchacher e Ledermann (2020), [Interregional Crown Width Models for Individual Trees Growing in Pure and Mixed Stands in Austria](https://doi.org/10.3390/f11010114), modela larguras de copa de cerca de 8.900 árvores em 1.508 parcelas. As relações consideram dimensão da árvore, competição, mistura de espécies e características do sítio; respostas de copa diferem entre grupos.
+- Liu et al. (2023), [Disentangling interspecific and intraspecific variability in height-diameter allometry](https://doi.org/10.1093/forestry/cpad048), analisa 569.502 pares altura-diâmetro de 20 espécies em 53.808 parcelas e encontra variação entre e dentro de espécies associada a sítio, clima e competição.
+
+Os dados do Genesis são biomassa lenhosa por área de célula, não diâmetro, altura ou biomassa de cada árvore. Portanto, não é possível estimar uma alometria ou idade individual com essas observações. A iteração visual 142 usa alturas de exibição por perfil, variação individual derivada da seed e cobertura da copa derivada da função já existente `BotanyModel.Cover`; competição de vizinhança altera o porte apenas modestamente. São heurísticas de apresentação, sem novos parâmetros científicos ou calibração empírica.
+
+## Arquitetura procedural, crescimento e variação hereditária (SciSpace e fontes primárias, 21/10/2026)
+
+Uma nova consulta ao SciSpace encontrou linhas de pesquisa úteis para separar arquitetura da árvore, desenvolvimento e renderização. A tentativa de consulta ao Consensus nesta rodada retornou a mensagem de cota mensal esgotada; não foi usada como evidência nova.
+
+- Pałubicki et al. (2009), [Self-organizing tree models for image synthesis](https://www.algorithmicbotany.org/papers/selforg.sig2009.html): estrutura ramos a partir de gemas que competem por luz ou espaço, com regulação interna. É uma base melhor para desenvolvimento estrutural que ramificação fractal indiferenciada; o próprio artigo é um modelo de síntese de formas, não uma simulação completa de carbono, hidráulica e sobrevivência.
+- Prusinkiewicz et al. (2018), [Modeling plant development with L-systems](https://www.algorithmicbotany.org/papers/modeling-plant-development-with-l-systems.html): descreve sistemas de desenvolvimento em várias escalas e distingue modelos descritivos de mecanísticos. Regras de reescrita podem codificar ontogenia e sinais ambientais, mas a escolha do formalismo não valida os parâmetros biológicos.
+- Jucker et al. (2025), [The global spectrum of tree crown architecture](https://www.nature.com/articles/s41467-025-60262-x): mede relações de altura, diâmetro do tronco e copa em 374.888 árvores de 1.914 espécies. O estudo relaciona altura por diâmetro principalmente à água disponível e competição por luz; largura da copa associa-se sobretudo à exposição a vento e fogo. Isso apoia combinar arquitetura herdável com plasticidade do ambiente, sem transferir coeficientes globais diretamente ao cenário fictício.
+
+O HTML de referência fornecido foi inspecionado como material técnico local. Seu G7 define loci paramétricos para dimensões, lobos, nervuras, pigmento, rigidez e longevidade, com expressão fenotípica determinística e limites por espécie; o próprio código identifica esse mecanismo como modelo estilizado, não calibrado como simulador genético empírico. Os pontos de inserção persistentes e o cache/LOD do G8 também são ideias úteis. Foram reaproveitados os conceitos gerais; o renderer MonoGame gera seus materiais em C# e não depende do runtime JavaScript do HTML.
+
+Para o Genesis, `genótipo` deve significar inicialmente um vetor de características quantitativas herdáveis e delimitadas por espécie, não DNA nem um mapa molecular. Fenótipo precisa combinar esse vetor com idade/estágio, estado fisiológico e ambiente. Recombinação, mutação e seleção só passam a ser parte da ecologia quando houver identidade persistida por organismo e esses estados fizerem parte dos snapshots. A seed visual atual garante repetibilidade de apresentação, mas não cria herança biológica.
+
+O renderer continua sendo uma leitura: câmera, LOD, malha e atlas gerado não avançam idade, não alteram genótipo e não consomem RNG ecológico. O snapshot atual ainda contém biomassa lenhosa agregada por célula, sem árvores individuais persistidas; por isso, nascimento, crescimento, reprodução e morte por indivíduo permanecem trabalho futuro da Biosfera, não recursos já simulados.
+
+### Gradiente vertical do tamanho foliar
+
+Hagemeier e Leuschner (2019), [Functional Crown Architecture of Five Temperate Broadleaf Tree Species](https://www.mdpi.com/1999-4907/10/3/265), mediram 29 árvores adultas de cinco espécies temperadas de folhas largas, incluindo bétula-prateada (*Betula pendula*) e carvalho-séssil (*Quercus petraea*). O tamanho das folhas aumentou continuamente com a profundidade da copa em *B. pendula*; em *Q. petraea*, atingiu o máximo no meio da copa e diminuiu em direção à parte sombreada inferior. Área foliar específica e ângulo também variaram verticalmente nas espécies estudadas, mas não são representados nesta alteração.
+
+Como ensaio geométrico, o renderer aplica apenas a direção observada de variação do tamanho foliar aos arquétipos visuais de bétula e carvalho. Uma curva ilustrativa limitada a 0,90–1,10 escala comprimento e largura das lâminas conforme a altura relativa dentro do envelope da copa; os limites são escolhas gráficas, não coeficientes do artigo. Os demais arquétipos mantêm folhas de tamanho uniforme. A amostra e os resultados não calibram essa curva para o ecossistema fictício, nem justificam mudanças de cor, densidade, crescimento, sobrevivência ou distribuição por habitat.
+
+## Fenologia e pigmento foliar: limite da representação atual
+
+As cores de outono não são uma resposta visual universal ao calendário. Renner e Zohner (2019) sintetizam diferenças filogenéticas e regionais na ocorrência de folhas vermelhas/amarelas e discutem interações de pigmentos, irradiância e temperatura durante a senescência. Xie et al. (2022) observaram variação de cor e fenologia entre 46 espécies lenhosas decíduas temperadas; a coloração variou entre vermelho, amarelo, verde e estados intermediários, com diferenças entre espécies e anos. A meta-análise de Liu et al. (2015) também mostra que latitude altera o peso relativo de fotoperíodo e temperatura na data de senescência. Nenhuma dessas fontes fornece uma paleta ou coeficiente transferível diretamente para o cenário fictício do Genesis.
+
+- Renner & Zohner (2019), [The occurrence of red and yellow autumn leaves explained by regional differences in insolation and temperature](https://doi.org/10.1111/nph.15900), *New Phytologist* 224(2):432–439.
+- Xie et al. (2022), [Coloration and phenology manifest nutrient variability in senesced leaves of 46 temperate deciduous woody species](https://doi.org/10.1093/jpe/rtab105), *Journal of Plant Ecology* 15(4):700–711.
+- Liu et al. (2015), [Changes in autumn senescence in northern hemisphere deciduous trees: a meta-analysis of autumn phenology studies](https://doi.org/10.1093/aob/mcv055), *Annals of Botany* 116(6):875–888.
+
+Consequências no renderer deste protótipo:
+
+- O calendário visual segue a estação publicada no snapshot; não existe mais prévia independente que force cores de uma estação.
+- Folhagem sadia usa swatches qualitativos fixos por arquétipo, apoiados em descritores botânicos de espécies representativas na seção abaixo. Como a coluna de espécie ainda não existe no snapshot, eles não são uma atribuição taxonômica nem valores RGB medidos; a seed nunca sorteia pigmento, e não há amarelo/laranja sazonal ou por indivíduo.
+- A perda de folhas no inverno usa o traço explícito `LeafHabit` dos perfis de demonstração. Os cinco perfis continuam sendo arquétipos temperados estilizados, não táxons ou parâmetros fenológicos validados. A regra grosseira deve ser substituída por fenologia por espécie/local quando esses dados existirem.
+- A distribuição de árvores e os arbustos de sub-bosque continuam receitas visuais sobre biomassa/ambiente agregado, não populações de espécies simuladas. Flores foram retiradas da cena porque o snapshot não expõe espécie, florescimento ou estado reprodutivo. Amarelecimento por seca/doença, pigmento de outono e reprodução visível aguardam estados e causas correspondentes na Biosfera.
+
+Essa simplificação é intencional: a referência visual não justifica pigmentos nem comportamentos. A próxima representação deve conservar agrupamento, volume e leitura da paisagem por geometria, silhueta, densidade, luz e sombra; detalhes que custem GPU/CPU devem ser aceitos pelo ganho visual medido, não por quantidade de polígonos.
+
+## Casca: diferenças de espécie e limite da representação
+
+Guias de identificação descrevem diferenças estáveis de casca: o carvalho-inglês é cinza-acastanhado e torna-se rugoso/fissurado com a maturidade; o pinheiro-silvestre tem casca escamosa castanho-alaranjada, mais avermelhada na copa e castanha na base; a bétula-prateada tem casca branca, com base escura e fissuras que se acentuam com a idade; o bordo-campestre é castanho-claro e descamativo; o salgueiro-cinzento é cinza-acastanhado e fissurado com a idade.
+
+- [Woodland Trust — oak bark](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/oak-tree-wildlife/).
+- [Woodland Trust — Scots pine](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/scots-pine/).
+- [Woodland Trust — silver birch](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/silver-birch/).
+- [Woodland Trust — field maple](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/field-maple/).
+- [Woodland Trust — grey willow](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/grey-willow/).
+
+Na iteração 18, a casca deixou de usar creme em quase todas as árvores: carvalho e salgueiro usam tons cinza-acastanhados, pinheiro usa castanho mais quente, bordo castanho-claro e bétula permanece clara. São swatches qualitativos de apresentação baseados nesses descritores, não medidas espectrais nem perfis taxonômicos validados. Não adicionamos o escurecimento basal/gradiente de idade: `TreeVisual.Maturity` deriva de cobertura lenhosa agregada para desenvolver a copa e não é idade individual. Esse efeito precisa aguardar idade/estágio real por árvore no snapshot.
+
+## Tons de folhagem sadia no verão
+
+Descritores de espécies também sustentam diferenças limitadas dentro dos verdes: agulhas de pinheiro-silvestre são azul-esverdeadas, folhas de bétula-prateada são verde-claras e folhas de bordo-campestre são verde-escuras e brilhantes. Folhas de salgueiro-osier são verde-escuras com pelos prateados na face inferior. As referências registram ainda mudanças sazonais para amarelos/dourados, mas essa mudança requer estação/estado fisiológico compatível e não é aplicada à captura de verão.
+
+- [Woodland Trust — Scots pine](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/scots-pine/).
+- [Woodland Trust — silver birch](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/silver-birch/).
+- [Woodland Trust — field maple](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/field-maple/).
+- [Woodland Trust — osier willow](https://www.woodlandtrust.org.uk/trees-woods-and-wildlife/british-trees/a-z-of-british-trees/osier-willow/).
+
+O renderer usa swatches RGB qualitativos e fixos por arquétipo no snapshot de verão: azul-esverdeado para conífera, verde mais claro para bétula e verde mais escuro para bordo; carvalho e salgueiro permanecem em verdes médios. Não são valores de clorofila/refletância medidos, não mudam por seed nem por câmera e não inferem seca/doença. Como a coluna taxonômica ainda não existe no snapshot, essas cores são apenas hipótese de apresentação inspirada em descritores, não uma previsão de espécies nesta ilha. Quando espécies observadas ou populacionais forem publicadas, o vínculo deverá migrar para os estados persistidos. A antiga região amarelada de deserto era posicionada pela seed e foi removida; a indicação atual de superfície seca deriva da saturação do solo e da água superficial do snapshot, sem recolorir folhas ou ocultar plantas.

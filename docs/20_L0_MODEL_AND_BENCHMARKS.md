@@ -1,6 +1,10 @@
 # Modelos L0, parâmetros, tolerâncias e metas de desempenho
 
-**Status:** especificação documental para o primeiro mundo; não é código implementado nem calibração ecológica. **Escopo:** mapa finito do MVP e processos necessários para clima, água, duas plantas funcionais, herbívoro, predador e decomposição. A física atmosférica, a fisiologia e os comportamentos são aproximações transparentes de jogo.
+> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
+
+**Status:** contrato do cenário implementado e evidência por revisão; não é calibração ecológica. **Escopo:** mapa finito do MVP e processos necessários para clima, água, duas plantas funcionais, herbívoro, predador e decomposição. A física atmosférica, a fisiologia e os comportamentos são aproximações transparentes de jogo.
+
+As métricas gráficas históricas deste documento descrevem builds do cliente MonoGame e são evidência do protótipo nesta máquina. Elas não comparam técnicas nem aprovam a direção visual final. O gate de apresentação compara as técnicas na mesma cena, máquina e metas dentro do MonoGame, conforme [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md). Não alterar os contratos ou parâmetros científicos para otimizar uma comparação de renderer.
 
 As equações abaixo são o contrato L0 para a implementação futura. Os valores são parâmetros iniciais de engenharia, não constantes universais nem previsões da Terra. Se um gate falhar, ajustar primeiro o processo responsável, registrar seed/configuração e atualizar a versão do cenário. Não acrescentar processos adiados para compensar um parâmetro ruim.
 
@@ -8,7 +12,7 @@ As equações abaixo são o contrato L0 para a implementação futura. Os valore
 
 | Parâmetro | Valor L0 |
 |---|---:|
-| `scenarioId` | `temperate-valley-l0-v15` |
+| `scenarioId` | `temperate-valley-l0-v17` |
 | Seed canônica | `1` (hexadecimal `0x0000000000000001`) |
 | Seeds de integração | `1`, `2`, `3` |
 | Grade | 64 × 64 células finitas; simular a grade toda, mesmo fora da câmera |
@@ -318,14 +322,14 @@ Os limites de 40 herbívoros e 4 predadores são condição do cenário e da med
 
 ## Metas de desempenho para N0–N4
 
-Referência de medição disponível neste ambiente em 21/10/2026: Windows 11 Pro, Intel Core i3-10105 (4 núcleos/8 threads), 16 GiB RAM, NVIDIA GeForce RTX 5060. Registrar versão do SDK/runtime, build Release, hash, resolução, drivers, hardware, seed e configuração em cada medição; os valores da tabela abaixo são metas. Medir headless em CPU, sem log por evento/tick; medir desktop em 1280×720 com mapa 64×64 e camadas de inspeção.
+Alvos de plataforma desktop definidos pelo usuário em 21/10/2026: **mínimo 8 GB de RAM + 4 GB de VRAM; recomendado para melhor desempenho 16 GB de RAM + 8 GB de VRAM**. A máquina de referência medida tem 15,87 GiB de RAM e uma NVIDIA GeForce RTX 5060 com 8.151 MiB reportados pelo driver; ela corresponde à classe recomendada. Ainda falta validar a carga completa em uma máquina da classe mínima. Registrar versão do SDK/runtime, build Release, hash, resolução, drivers, hardware, seed e configuração em cada medição; os valores da tabela abaixo são metas. Medir headless em CPU, sem log por evento/tick; medir desktop em 1280×720 com mapa 64×64 e camadas de inspeção.
 
 | Marco | Meta objetiva |
 |---|---|
 | N0 | avançar 1000 ticks do boot headless em ≤5 s, após JIT/aquecimento; sem renderer |
 | N3 headless integrado | seed 1, 64×64, 40 herbívoros + 4 predadores iniciais, reprodução ativa; ≥20 dias simulados/s, mediana de 3 execuções Release; cada janela cronometrada começa do estado inicial e termina em 365 dias (≤18.25 s) |
-| N4 desktop | ≥30 FPS em média e P95 de quadro ≤33.3 ms, em janela contínua de 60 s; P99 ≤50 ms na mesma cena e máquina; seed 1 desde dia zero, após aquecimento separado, 6 ticks/s real (1 hora simulada/s), câmera fixa mostrando toda a grade e camada de água ativa |
-| Memória | bytes privados estabilizados ≤512 MiB headless e ≤1 GiB desktop após carga de cenário |
+| N4 desktop | ≥30 FPS em média e P95 de quadro ≤33.3 ms, em janela contínua de 60 s; P99 ≤50 ms na mesma cena e máquina; seed 1 desde dia zero, após aquecimento separado, 6 ticks/s real (1 hora simulada/s), enquadramento registrado mostrando toda a grade e camada de água ativa |
+| Memória | bytes privados estabilizados ≤512 MiB headless; no desktop, registrar bytes privados, working set e memória de GPU quando disponível. Não há teto fixo de memória privada do processo: validar a experiência na plataforma mínima (8 GB RAM/4 GB VRAM) e ajustar cena, cache e LOD caso a medição revele pressão de memória |
 | Persistência | salvar e carregar/validar estado integrado da seed 1 no dia 365 em ≤2 s cada; save do dia 365 ≤10 MiB, excluindo cache recriável de imagem |
 | Integridade | nenhuma perda de tick/evento após pause/resume/save; carga não muda o hash canônico da continuação |
 
@@ -439,3 +443,19 @@ Benchmark Release, seed 1, 1280 × 720, 6 ticks/s, aquecimento de 5 s e mediçã
 O cliente usa ângulo aproximado de 30° da vertical, ainda ortográfico; as fitas visuais dos cursos D8 são interpoladas por Catmull–Rom e amostram a elevação em cada ponto. O modo `--capture` oculta o HUD para produzir uma imagem limpa de revisão. Nada disso muda o cenário v15 nem a simulação.
 
 Em Release, seed 1, 1280 × 720, 6 ticks/s, aquecimento de 5 s e medição de 60 s: 3461 quadros, média 57.67 FPS, P95 30.52 ms, P99 49.53 ms, CPU 57.4% de um núcleo e working set 198.2 MiB. A amostra cumpre N4 e memória desktop. SHA256 de `Game.Client.Desktop.dll`: `CAA672EBB0E35E95707AECAAC15A6231CE4FBDF24D43A569696E32A59E396294`; `Game.Modules.Geosphere.dll`: `F0CF904A047F002F4CF5588307218B05B01C92795A9B086B58FB07DC94C40E55`. Captura `genesis-geometric-v26-camera-depth.png` e resultado bruto `genesis-render-benchmark-v26-camera-depth.txt` ficam no diretório de visualizações do Codex. A inclinação deixa os paredões mais legíveis; a água ainda cobre áreas largas e a floresta mantém bordas em manchas.
+
+### Geografia v16 — relevo e platôs elevados
+
+A v16 eleva as amplitudes das cristas oeste/leste para 170–190 m e 132–150 m; as seis cristas secundárias passam a 24–36 m. Quatro platôs menores seguem os eixos montanhosos, cada um com centro, orientação, contorno e cota derivados da seed. Somados às três feições anteriores, são sete coroas planas com faces laterais; D8, água inicial, gradientes e implantação de flora continuam consumindo o mesmo campo físico da Geosfera. O limite de cota do sampler/coroas sobe de 190 para 340 m. Os valores são parâmetros geométricos L0, sem alegação de calibração geológica.
+
+`dotnet test Game.sln -c Release --nologo`: 22/22 aprovados. As seeds 1–3 avançaram até tick 144 (dia 2): seed 1, altitude `18.2–231.8 m`, 138 células com pelo menos 20 mm de água, 2231 grupos de gramínea e 1941 lenhosos, hash `9F3129564AEED8C2D51C7BB43F17A5ACFE604D7146068B98269C82F6B1681BBA`; seed 2, `20.4–246.5 m`, 120 células, 2301 gramíneas e 1763 lenhosos, hash `AB5B6A7B8C7B92A4B8116CFBE1B4335B4A291B2EE21F02A7F17DD682A94B2CF3`; seed 3, `17.7–235.6 m`, 135 células, 2423 gramíneas e 1889 lenhosos, hash `8202F135D060C2EDCDD4A59BF80DF10D980E1EE41124E6CBC86BA93D436061A5`. Os resíduos máximos absolutos foram `6.381×10⁻⁷ L` de água, `5.597×10⁻⁶ g` de matéria seca e `1.770×10⁻⁸ gN`. A captura `genesis-geometric-v27-ridge-tablelands.png` fica no diretório de visualizações do Codex.
+
+Benchmarks desktop Release, seed 1, 1280 × 720, 6 ticks/s, aquecimento de 5 s e janelas de 60 s: amostra 1 — 3495 frames, média 58.24 FPS, P95 24.52 ms, P99 58.97 ms, CPU 47.6% de um núcleo, working set 175.9 MiB; amostra 2 — 2533 frames, média 42.22 FPS, P95 38.71 ms, P99 70.23 ms, CPU 44.0% de um núcleo, working set 172.1 MiB; amostra 3 — 3423 frames, média 57.05 FPS, P95 30.49 ms, P99 61.04 ms; amostra 4 — 3361 frames, média 56.00 FPS, P95 30.01 ms, P99 72.52 ms. As quatro amostras não aprovam o gate N4. SHA256 antes da implementação hidrológica v17: `Game.Client.Desktop.dll` `43EB0706F0BF073BC0603AE40125641E42849EE570B4097B5280DCF9E814EFED`; `Game.Modules.Geosphere.dll` `C29B046533063B1166193913E92E37BF17FA83F999898CF820059CE3AC83E0DB`. Capturas e logs brutos ficam no diretório de visualizações do Codex.
+
+### Hidrologia v17 — soleiras e reservatórios de depressão
+
+O `Hydrosphere` acrescenta um Priority-Flood determinístico a partir da borda aberta do mapa. O campo de elevação preenchida é um resultado topológico separado: `WorldCell.ElevationM` permanece intacto. A implementação expõe receptores/área contribuinte, componentes deprimidas agrupadas por soleira, capacidade até o spill e funções nível–volume–área. A semeadura inicial seleciona até três bacias e instala pools abaixo da soleira com nível constante sobre o fundo irregular. A alteração não simula ainda chuva enchendo essas curvas nem extravasamento dinâmico; o `Route` anterior e a rede D8 continuam ativos.
+
+O cenário passa a `temperate-valley-l0-v17`. `dotnet test Game.sln -c Release --nologo`: 24/24 aprovados, incluindo uma bacia sintética com cota de soleira de 5 m, capacidade de 4.500 m³ e volume/área conferidos em nível intermediário, além de repetibilidade e alcance da borda. Seeds 1–3 avançaram a 144 ticks; elevação: seed 1 `18.2–231.8 m`, 939 células com água, 2220 grupos de gramínea e 1948 lenhosos, hash `BE5B7203E9F557C0A0585462CB9B5D87A803E9E90BD283D9E2522854F8797E49`; seed 2 `20.4–246.5 m`, 1006 células, 2267 gramíneas e 1739 lenhosos, hash `F4E4ED54B19AA047D2C564C543BF7124849180D286E918A0D3699EA98A051E1A`; seed 3 `17.7–235.6 m`, 1070 células, 2426 gramíneas e 1882 lenhosos, hash `71BB92133FC8F6FC1015E5B2F561684E510B892B65D60126FE1603A317C6948C`. Resíduos máximos absolutos foram `6.974×10⁻⁷ L` de água, `6.355×10⁻⁶ g` de matéria seca e `1.676×10⁻⁸ gN`.
+
+`PixelTerrainTexture` calcula linhas independentes em paralelo. A malha detalhada da água passa de 8 para 6 subdivisões por célula e reutiliza a rede D8 entre atualizações horárias; o detalhe do ribbon do rio continua Catmull–Rom. Benchmark Release em seed 1, 1280 × 720, 6 ticks/s, 5 s de aquecimento e 60 s medidos: 3464 quadros, média `57.72 FPS`, P95 `30.35 ms`, P99 `49.22 ms`, CPU `50.0%` de um núcleo e working set `182.4 MiB`; atende o gate de percentis N4 por margem estreita. Os máximos medidos de reconstrução foram `123.41 ms` para malha de água e `140.90 ms` para textura de terreno, embora esses picos não tenham elevado o P99 acima do limite. Amostra curta de 10 s: `59.11 FPS`, P95 `18.11 ms`, P99 `49.71 ms` (referência, não gate). SHA256: cliente `6752E7FAA719E9E576EAC8FA427843AB98A781B6558E5B90922A2F20A6840F5E`, Hydrosphere `3390064859D594D3838F6AFF26149EDEC27E5BE56F5B9624EF9B964663BAEFE4`, Geosphere `C29B046533063B1166193913E92E37BF17FA83F999898CF820059CE3AC83E0DB`. Captura `genesis-hydrology-v17-level-pools.png`; log bruto `C:\Users\Julio\.codex\visualizations\2026\10\21\01a15cc0-05ed-78f0-a37b-f0d61e31cb96\genesis-render-benchmark-v28-hydrology.txt`. O renderer ainda não deriva largura de vazão medida, e os picos de reconstrução seguem como dívida de desempenho.

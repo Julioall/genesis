@@ -1,6 +1,22 @@
 # Revisão dos documentos — 21/10/2026
 
-## Parecer
+## Revisão 2.8 — direção visual no MonoGame
+
+O usuário retirou a exigência de 2D/top-down/pixel art e pediu uma direção visual com base em duas imagens de referência. Em seguida, confirmou que o projeto deve permanecer na stack MonoGame para que o trabalho seja produzido por IA. Os requisitos visuais e a comparação de técnicas dentro do MonoGame estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md). As imagens recebidas foram copiadas para `docs/references/visual-direction/` para manter os links documentais portáveis.
+
+Foram atualizados escopo, GDD, instruções de entrada, template operacional, prompt mestre, geração procedural, roadmap, gate de plataforma/web, testes, README, índices e registros visuais. A ADR-0004 registra MonoGame como stack fixa e as técnicas visuais que seguem em avaliação; ADR-0002 foi atualizada para manter vigente a escolha de MonoGame e marcar como históricas as restrições antigas de câmera e estilo. Contratos científicos, parâmetros L0 e escopo funcional N0–N3 foram preservados. Os benchmarks MonoGame permanecem como evidência do protótipo e foram qualificados como não comparativos.
+
+**Resultado desta revisão:** orientação documental alinhada; MonoGame confirmado como stack e nenhuma migração iniciada. Não foram alterados código, modelos quantitativos ou parâmetros físicos/biológicos. A comparação de técnicas é qualitativa e documental; a decisão visual de N4 permanece condicionada ao protótipo e à medição da cena dentro do MonoGame. Não foram executados build ou testes de código nesta revisão documental.
+
+O repositório já continha alterações locais antes da revisão. Elas foram preservadas; mudanças preexistentes em código não fazem parte desta entrega documental. Os registros de protótipos locais foram identificados como tal, e o README identifica os comandos e o cenário v17 como parte da implementação local, ausente nesta branch documental.
+
+Validação para publicação: 43 arquivos Markdown inspecionados, 140 links locais conferidos sem destinos ausentes e diff sem erros de whitespace. A checagem confirmou MonoGame como stack do cliente, núcleo C# independente e geração visual procedural. Os benchmarks históricos não foram reexecutados.
+
+## Revisão anterior 2.6 e histórico
+
+As seções restantes registram conclusões das revisões anteriores. Trechos sobre cliente 2D/pixel art, disponibilidade de código, renderer e benchmarks descrevem o pacote e o estado observados então; a revisão 2.8 acima é a referência atual para a direção visual e tecnológica.
+
+## Parecer histórico
 
 A proposta é coerente como monólito modular e simulador ecológico L0: cinco domínios, recursos finitos, fluxos auditáveis, determinismo e separação da apresentação. O escopo original tinha riscos de infraestrutura antecipada e lacunas de contabilidade. Os documentos foram corrigidos para orientar uma implementação incremental sem retirar vegetação, fauna, predação ou decomposição.
 

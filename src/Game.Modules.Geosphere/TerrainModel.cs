@@ -118,10 +118,14 @@ public static class TerrainModel
         private readonly MountainRange[] _mountainRanges;
         private readonly RidgeSpur[] _ridgeSpurs;
         private readonly double _riverPhase;
+        private readonly double _scaleX;
+        private readonly double _scaleY;
         private readonly OutcropFeature[] _outcrops;
 
         public TerrainGenerator(ulong seed)
         {
+            _scaleX = SimulationState.Width / 64.0;
+            _scaleY = SimulationState.Height / 64.0;
             _broad = new ValueNoise(seed, 26, 0x5445525241494E31UL);
             _regional = new ValueNoise(seed, 12, 0x5445525241494E32UL);
             _detail = new ValueNoise(seed, 4, 0x5445525241494E33UL);
@@ -138,44 +142,66 @@ public static class TerrainModel
             [
                 new MountainRange(
                     0,
-                    12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 49, 1, 0, 0) * 4,
+                    (12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 49, 1, 0, 0) * 4) * _scaleX,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 50, 1, 0, 0) * 0.24,
-                    4.6 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 51, 1, 0, 0) * 1.0,
-                    100 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 14,
+                    (4.6 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 51, 1, 0, 0) * 1.0) * _scaleX,
+                    170 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 20,
                     westPhase),
                 new MountainRange(
                     1,
-                    48 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 53, 1, 0, 0) * 4,
+                    (48 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 53, 1, 0, 0) * 4) * _scaleX,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 54, 1, 0, 0) * 0.24,
-                    4.0 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 55, 1, 0, 0) * 0.9,
-                    78 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 10,
+                    (4.0 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 55, 1, 0, 0) * 0.9) * _scaleX,
+                    132 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 18,
                     eastPhase)
             ];
             _ridgeSpurs = CreateRidgeSpurs(seed);
-            var plateauX = 43 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 42, 1, 0, 0) - 0.5) * 8;
-            var plateauY = 18 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 43, 1, 0, 0) - 0.5) * 6;
-            var plateauRadiusX = 2.9 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 44, 1, 0, 0) * 0.9;
-            var plateauRadiusY = 1.9 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 45, 1, 0, 0) * 0.7;
+            var plateauX = (43 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 42, 1, 0, 0) - 0.5) * 8) * _scaleX;
+            var plateauY = (18 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 43, 1, 0, 0) - 0.5) * 6) * _scaleY;
+            var plateauRadiusX = (2.9 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 44, 1, 0, 0) * 0.9) * _scaleX;
+            var plateauRadiusY = (1.9 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 45, 1, 0, 0) * 0.7) * _scaleY;
             var plateauHeight = 94 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 46, 1, 0, 0) * 8;
             var plateauPhase = CounterRandom.Unit(seed, CounterRandom.TerrainTag, 47, 1, 0, 0) * Math.PI * 2;
-            _outcrops =
-            [
+            var seededOutcrops = new List<OutcropFeature>
+            {
                 CreateOutcrop(0, plateauX, plateauY, plateauRadiusX, plateauRadiusY, plateauHeight, plateauPhase),
                 CreateOutcrop(1,
-                    15 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 57, 1, 0, 0) - 0.5) * 3,
-                    17 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 58, 1, 0, 0) - 0.5) * 4,
-                    1.15 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 59, 1, 0, 0) * 0.55,
-                    1.05 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 60, 1, 0, 0) * 0.55,
+                    (15 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 57, 1, 0, 0) - 0.5) * 3) * _scaleX,
+                    (17 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 58, 1, 0, 0) - 0.5) * 4) * _scaleY,
+                    (1.15 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 59, 1, 0, 0) * 0.55) * _scaleX,
+                    (1.05 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 60, 1, 0, 0) * 0.55) * _scaleY,
                     126 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 61, 1, 0, 0) * 8,
                     CounterRandom.Unit(seed, CounterRandom.TerrainTag, 62, 1, 0, 0) * Math.PI * 2),
                 CreateOutcrop(2,
-                    57 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 63, 1, 0, 0) - 0.5) * 3,
-                    19 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 64, 1, 0, 0) - 0.5) * 4,
-                    1.05 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 65, 1, 0, 0) * 0.6,
-                    1.15 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 66, 1, 0, 0) * 0.55,
+                    (57 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 63, 1, 0, 0) - 0.5) * 3) * _scaleX,
+                    (19 + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 64, 1, 0, 0) - 0.5) * 4) * _scaleY,
+                    (1.05 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 65, 1, 0, 0) * 0.6) * _scaleX,
+                    (1.15 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 66, 1, 0, 0) * 0.55) * _scaleY,
                     128 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 67, 1, 0, 0) * 8,
                     CounterRandom.Unit(seed, CounterRandom.TerrainTag, 68, 1, 0, 0) * Math.PI * 2)
-            ];
+            };
+
+            // Add smaller tablelands on both mountain flanks. Their locations follow the seeded
+            // ridge axes, so the cliffs belong to the same physical landforms as the drainage.
+            for (var rangeIndex = 0; rangeIndex < _mountainRanges.Length; rangeIndex++)
+            for (var shelf = 0; shelf < 2; shelf++)
+            {
+                var range = _mountainRanges[rangeIndex];
+                var featureIndex = 3 + rangeIndex * 2 + shelf;
+                var id = (ulong)featureIndex;
+                var north = (shelf == 0 ? 36.0 : 52.0) * _scaleY;
+                north += (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 100 + id, 1, 0, 0) - 0.5) * 3.0 * _scaleY;
+                var east = MountainAxis(range, north)
+                    + (CounterRandom.Unit(seed, CounterRandom.TerrainTag, 110 + id, 1, 0, 0) - 0.5) * 2.6 * _scaleX;
+                var radiusEast = (0.92 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 120 + id, 1, 0, 0) * 0.32) * _scaleX;
+                var radiusNorth = (0.82 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 130 + id, 1, 0, 0) * 0.35) * _scaleY;
+                var crown = UnderlyingElevation(east, north)
+                    + 24 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 140 + id, 1, 0, 0) * 8;
+                var phase = CounterRandom.Unit(seed, CounterRandom.TerrainTag, 150 + id, 1, 0, 0) * Math.PI * 2;
+                seededOutcrops.Add(CreateOutcrop(featureIndex, east, north, radiusEast, radiusNorth, crown, phase));
+            }
+
+            _outcrops = seededOutcrops.ToArray();
         }
 
         public double Elevation(double x, double y)
@@ -188,12 +214,14 @@ public static class TerrainModel
 
         public double UnderlyingElevation(double x, double y)
         {
-            var broad = _broad.Sample(x, y) * 2 - 1;
-            var regional = _regional.Sample(x, y) * 2 - 1;
-            var detail = _detail.Sample(x, y) * 2 - 1;
+            var normalizedX = x / _scaleX;
+            var normalizedY = y / _scaleY;
+            var broad = _broad.Sample(normalizedX, normalizedY) * 2 - 1;
+            var regional = _regional.Sample(normalizedX, normalizedY) * 2 - 1;
+            var detail = _detail.Sample(normalizedX, normalizedY) * 2 - 1;
             var valleyCenter = RiverCenter(y);
             var valleyDistance = x - valleyCenter;
-            var valleyInfluence = Math.Exp(-Math.Pow(valleyDistance / 13.5, 2));
+            var valleyInfluence = Math.Exp(-Math.Pow(valleyDistance / (13.5 * _scaleX), 2));
             var noiseFactor = 1 - 0.82 * valleyInfluence;
             var height = 62 + (broad * 15 + regional * 8 + detail * 2.8) * noiseFactor;
 
@@ -206,16 +234,18 @@ public static class TerrainModel
                 var shoulder = Math.Exp(-Math.Pow(across / range.WidthCells, 2));
                 var crest = Math.Exp(-Math.Pow(across / (range.WidthCells * 0.24), 2));
                 var brokenMassif = 0.54 + 0.46 * SmoothStep(0.16, 0.88,
-                    _mountainMask.Sample((x + range.Phase * 2.5) * 0.38, (y + range.Phase) * 0.42));
-                var summitRhythm = 0.62 + 0.38 * Math.Pow(0.5 + 0.5 * Math.Sin(y * 0.34 + range.Phase * 1.3), 1.4);
-                var rangeEnds = SmoothStep(-2, 7, y) * (1 - SmoothStep(56, 64, y));
+                    _mountainMask.Sample((normalizedX + range.Phase * 2.5) * 0.38,
+                        (normalizedY + range.Phase) * 0.42));
+                var summitRhythm = 0.62 + 0.38 * Math.Pow(0.5 + 0.5 * Math.Sin(y * 0.34 / _scaleY + range.Phase * 1.3), 1.4);
+                var rangeEnds = SmoothStep(-2 * _scaleY, 7 * _scaleY, y)
+                    * (1 - SmoothStep((SimulationState.Height - 8 * _scaleY), SimulationState.Height, y));
                 height += range.AmplitudeM * (0.76 * shoulder + 0.24 * crest)
                     * brokenMassif * summitRhythm * rangeEnds;
 
                 var ridgeContinuity = 0.34 + 0.66 * SmoothStep(0.14, 0.86,
-                    _ridgeMask.Sample(x * 0.35, y));
-                var innerFold = axis + (range.Index == 0 ? 1 : -1) * 7.0;
-                height += 3.5 * ridgeContinuity * Math.Exp(-Math.Pow((x - innerFold) / 3.8, 2)) * rangeEnds;
+                    _ridgeMask.Sample(normalizedX * 0.35, normalizedY));
+                var innerFold = axis + (range.Index == 0 ? 1 : -1) * 7.0 * _scaleX;
+                height += 3.5 * ridgeContinuity * Math.Exp(-Math.Pow((x - innerFold) / (3.8 * _scaleX), 2)) * rangeEnds;
             }
 
             // Lower, narrower tributary ridges extend from the mountain shoulders toward the valley.
@@ -235,17 +265,17 @@ public static class TerrainModel
 
             // A wide lowland carries the meander; a shallow narrow incision keeps the river in its valley.
             height -= 22 * valleyInfluence;
-            height -= 8 * Math.Exp(-Math.Pow(valleyDistance / 2.6, 2));
-            height += (y - 31.5) * 0.42; // the valley falls from the southern edge toward the north
+            height -= 8 * Math.Exp(-Math.Pow(valleyDistance / (2.6 * _scaleX), 2));
+            height += (y - (SimulationState.Height - 1) * 0.5) * 0.42; // the valley falls from the southern edge toward the north
 
             // Small, continuous rock and soil undulations break the long smooth flanks. Keep them
             // subdued in the wet valley floor so drainage remains legible; the renderer samples
             // this same physical field at a finer resolution than the ecological grid.
-            var meso = _mesoRelief.Sample(x, y) * 2 - 1;
-            var micro = _microRelief.Sample(x, y) * 2 - 1;
+            var meso = _mesoRelief.Sample(normalizedX, normalizedY) * 2 - 1;
+            var micro = _microRelief.Sample(normalizedX, normalizedY) * 2 - 1;
             var reliefMask = noiseFactor * (0.22 + 0.78 * SmoothStep(50, 112, height));
             height += (meso * 4.8 + micro * 2.6) * reliefMask;
-            return Math.Clamp(height, 8, 190);
+            return Math.Clamp(height, 8, 340);
         }
 
         public IReadOnlyList<PlateauGeometry> OutcropGeometries(int rimSegments)
@@ -294,7 +324,7 @@ public static class TerrainModel
 
             return feature with
             {
-                CrownElevationM = Math.Min(190, Math.Max(baseCrownElevationM, highestRimToe + MinimumPlateauReliefM))
+                CrownElevationM = Math.Min(340, Math.Max(baseCrownElevationM, highestRimToe + MinimumPlateauReliefM))
             };
         }
 
@@ -317,16 +347,17 @@ public static class TerrainModel
                     20 + feature.Index * 11 + Math.Sin(angle) * 7) - 0.5);
 
         private double RiverCenter(double y)
-            => 34 + 8.5 * Math.Sin(y * 0.105 + _riverPhase)
-                + 3.2 * Math.Sin(y * 0.29 + _riverPhase * 0.63);
+            => SimulationState.Width * (34.0 / 64.0)
+                + 8.5 * _scaleX * Math.Sin(y * 0.105 / _scaleY + _riverPhase)
+                + 3.2 * _scaleX * Math.Sin(y * 0.29 / _scaleY + _riverPhase * 0.63);
 
         private double MountainAxis(MountainRange range, double y)
         {
             var axisNoiseX = range.Index == 0 ? 8 : 36;
-            var wandering = (_rangeAxis.Sample(axisNoiseX, y * 0.72) - 0.5) * 7.0;
-            return range.AnchorEastCells + range.AxisSlope * (y - 31.5)
-                + 1.8 * Math.Sin(y * 0.14 + range.Phase)
-                + 0.8 * Math.Sin(y * 0.33 + range.Phase * 0.71)
+            var wandering = (_rangeAxis.Sample(axisNoiseX, y * 0.72) - 0.5) * 7.0 * _scaleX;
+            return range.AnchorEastCells + range.AxisSlope * (y - (SimulationState.Height - 1) * 0.5) * _scaleX / _scaleY
+                + 1.8 * _scaleX * Math.Sin(y * 0.14 / _scaleY + range.Phase)
+                + 0.8 * _scaleX * Math.Sin(y * 0.33 / _scaleY + range.Phase * 0.71)
                 + wandering;
         }
 
@@ -343,20 +374,21 @@ public static class TerrainModel
                 var direction = branch == 2 ? -1.0 : 1.0;
                 var startNorth = branch switch
                 {
-                    0 => 10 + random * 4,
-                    1 => 29 + random * 4,
-                    _ => 51 - random * 4
+                    0 => (10 + random * 4) * _scaleY,
+                    1 => (29 + random * 4) * _scaleY,
+                    _ => (51 - random * 4) * _scaleY
                 };
-                var endNorth = Math.Clamp(startNorth + direction * (11 + bend * 5), 3, 60);
+                var endNorth = Math.Clamp(startNorth + direction * (11 + bend * 5) * _scaleY,
+                    3 * _scaleY, (SimulationState.Height - 4) * _scaleY);
                 var valleySide = range.Index == 0 ? -1 : 1;
                 var startEast = MountainAxis(range, startNorth)
                     + (range.Index == 0 ? 1 : -1) * range.WidthCells * 0.72;
-                var endEast = RiverCenter(endNorth) + valleySide * (5.5 + bend * 2.5);
+                var endEast = RiverCenter(endNorth) + valleySide * (5.5 + bend * 2.5) * _scaleX;
                 var bendEast = (startEast + endEast) * 0.5
-                    + (range.Index == 0 ? 1 : -1) * (bend - 0.5) * 5.0;
-                var bendNorth = (startNorth + endNorth) * 0.5 + (random - 0.5) * 4.0;
-                var width = 1.65 + random * 0.7;
-                var amplitude = 15 + bend * 8;
+                    + (range.Index == 0 ? 1 : -1) * (bend - 0.5) * 5.0 * _scaleX;
+                var bendNorth = (startNorth + endNorth) * 0.5 + (random - 0.5) * 4.0 * _scaleY;
+                var width = (1.65 + random * 0.7) * _scaleX;
+                var amplitude = 24 + bend * 12;
                 spurs[index++] = new RidgeSpur(startEast, startNorth, bendEast, bendNorth,
                     endEast, endNorth, width * width, amplitude,
                     Math.Min(startEast, Math.Min(bendEast, endEast)) - width * 4,

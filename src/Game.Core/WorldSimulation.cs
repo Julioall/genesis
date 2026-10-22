@@ -178,7 +178,12 @@ public sealed class WorldSimulation
         return totals;
     }
 
-    private static int ClimateTile(WorldCell cell) => (cell.Y / 16) * 4 + cell.X / 16;
+    private static int ClimateTile(WorldCell cell)
+    {
+        var tileWidth = SimulationState.Width / 4;
+        var tileHeight = SimulationState.Height / 4;
+        return (cell.Y / tileHeight) * 4 + cell.X / tileWidth;
+    }
 
     private static SimulationState CreateInitialState(ulong seed)
     {

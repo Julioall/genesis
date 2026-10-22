@@ -80,8 +80,8 @@ public readonly record struct FluxLedgerSnapshot(
 
 public sealed class SimulationState
 {
-    public const int Width = 64;
-    public const int Height = 64;
+    public const int Width = 256;
+    public const int Height = 256;
     public const double CellAreaM2 = 100.0;
     public const long TicksPerHour = 6;
     public const long TicksPerDay = 144;

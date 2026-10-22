@@ -1,4 +1,4 @@
-# Mundo procedural, arte pixel e desempenho
+# Mundo procedural, apresentação visual e desempenho
 
 As metas numéricas de desempenho e o cenário de medição L0 constam em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md); este documento não cria limites alternativos.
 
@@ -17,14 +17,14 @@ O termo 'genesis' da etapa 1 descreve o processo de origem do mundo e **não aut
 
 ## Princípios visuais
 
-- Câmera ortográfica fixa e predominantemente top-down, com relevo 3D geométrico para sustentar a leitura 2.5D. A Geosfera define elevações físicas; o cliente amostra a função contínua em malha triangulada sem decidir a geografia.
-- Plantas, pedras e gramíneas usam sprites procedurais cacheados; suas âncoras são projetadas a partir da posição e altitude do terreno. Não inclinar recursos arbitrariamente.
-- Pixel art legível; anti-alias/desfoque não devem adulterar paleta e pixels lógicos.
+- A câmera, projeção e dimensionalidade da representação serão escolhidas após a validação visual comparativa. A direção deve comunicar profundidade, volume, relevo, água, rocha e vegetação; requisitos completos estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md).
+- O cliente ancora todo objeto às coordenadas e à elevação física publicadas. Malhas, sprites, billboards ou técnicas híbridas são escolhas do renderer e não decidem geografia nem estado biológico.
+- Não há obrigação de pixel art, anti-aliasing específico, ortografia, perspectiva ou câmera fixa. A qualidade será avaliada por leitura e integração natural, sem limitar a técnica de antemão.
 - Mundo finito gerado antes do avanço; chunks visuais podem gerar recursos sob demanda para mostrar uma área maior que a tela. `seed` global estável, seeds locais derivadas por chunk, entidade, receita e versão.
 - Arbustos/árvores: parâmetros botânicos afetam morfologia procedural mas não implicam uma folha como entidade persistente.
 - Fora da tela, render desligado e simulação ativa. LOD visual detalhado é evolução posterior; não há LOD de simulação no MVP.
 - Não regenerar geometria completa de todas as árvores por quadro de vento. Cache inicial por receita, versão, grupo e estágio; adicionar estação/LOD e animação hierárquica apenas quando usados e medidos.
-- Recursos do renderer, `Texture2D`, `SpriteBatch`, shaders e eventos de input não entram em `Game.Modules.*`.
+- Recursos e APIs do renderer, shaders e eventos de input não entram em `Game.Modules.*`; sua tecnologia fica isolada no cliente/adaptador.
 
 ## Procedural e biologia não devem divergir
 

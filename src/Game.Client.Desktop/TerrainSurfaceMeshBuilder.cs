@@ -29,6 +29,21 @@ public static class TerrainSurfaceMeshBuilder
             || !double.IsFinite(cellSizeM) || cellSizeM <= 0)
             throw new ArgumentOutOfRangeException(nameof(cellsWide), "Terrain chunk bounds, subdivision, and scale must be positive and inside the world.");
 
+        return BuildMesh(elevationSampler, startXCells, startYCells, cellsWide, cellsHigh,
+            subdivisionsPerCell, worldWidthCells, worldHeightCells, cellSizeM);
+    }
+
+    private static TerrainMeshData BuildMesh(
+        Func<double, double, double> elevationSampler,
+        int startXCells,
+        int startYCells,
+        int cellsWide,
+        int cellsHigh,
+        int subdivisionsPerCell,
+        int worldWidthCells,
+        int worldHeightCells,
+        double cellSizeM)
+    {
         var columns = checked(cellsWide * subdivisionsPerCell);
         var rows = checked(cellsHigh * subdivisionsPerCell);
         var stride = columns + 1;
@@ -47,7 +62,8 @@ public static class TerrainSurfaceMeshBuilder
             var normal = Vector3.Normalize(new Vector3((float)-derivativeEast, 1, (float)-derivativeNorth));
             var position = new Vector3((float)(gridX * cellSizeM),
                 (float)elevationSampler(gridX, gridY), (float)(gridY * cellSizeM));
-            var uv = new Vector2((float)(gridX / worldWidthCells), (float)(gridY / worldHeightCells));
+            var uv = new Vector2((float)Math.Clamp(gridX / worldWidthCells, 0, 1),
+                (float)Math.Clamp(gridY / worldHeightCells, 0, 1));
             vertices[z * stride + x] = new VertexPositionNormalTexture(position, normal, uv);
         }
 

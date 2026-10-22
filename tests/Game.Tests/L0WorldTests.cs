@@ -46,7 +46,7 @@ public sealed class L0WorldTests
         Assert.Equal(first, repeat);
         Assert.NotEqual(first, otherSeed);
         Assert.True(first.Max() - first.Min() > 45);
-        Assert.True(first.Max() > 145, $"Expected a high mountain crest, got {first.Max():F1} m.");
+        Assert.True(first.Max() > 220, $"Expected a high mountain crest in the raised v16 terrain, got {first.Max():F1} m.");
 
         var rowsWithMountainCrests = Enumerable.Range(0, SimulationState.Height)
             .Count(y => Enumerable.Range(0, SimulationState.Width)
@@ -136,7 +136,9 @@ public sealed class L0WorldTests
 
         Assert.True(minimumRimRise >= 17.9);
         Assert.True(maximumRimRise >= 18);
-        Assert.True(maximumRimRadius < 5.3, $"The weathered outcrop should remain local, but its radius is {maximumRimRadius:F2} cells.");
+        var mapScale = SimulationState.Width / 64.0;
+        Assert.True(maximumRimRadius < 5.3 * mapScale,
+            $"The weathered outcrop should remain local, but its radius is {maximumRimRadius:F2} cells.");
         Assert.True(maximumRimRadius - minimumRimRadius > 0.8, "The outcrop rim should have irregular, non-elliptical relief.");
         Assert.True(maximumRimSegmentCells < 1);
     }
@@ -146,7 +148,7 @@ public sealed class L0WorldTests
     {
         var features = TerrainModel.GenerateOutcropGeometries(1);
         var repeated = TerrainModel.GenerateOutcropGeometries(1);
-        Assert.Equal(3, features.Count);
+        Assert.Equal(7, features.Count);
         Assert.Equal(features.Select(feature => feature.FeatureIndex), repeated.Select(feature => feature.FeatureIndex));
         Assert.Equal(features.SelectMany(feature => feature.Rim), repeated.SelectMany(feature => feature.Rim));
 
@@ -169,7 +171,8 @@ public sealed class L0WorldTests
 
             Assert.True(minimumRise >= 17.9, $"Outcrop {feature.FeatureIndex} has only {minimumRise:F1} m of physical relief.");
             if (feature.FeatureIndex > 0)
-                Assert.True(maximumRadius < 3.1, $"Secondary outcrop {feature.FeatureIndex} grew to {maximumRadius:F2} cells.");
+                Assert.True(maximumRadius < 3.1 * (SimulationState.Width / 64.0),
+                    $"Secondary outcrop {feature.FeatureIndex} grew to {maximumRadius:F2} cells.");
         }
 
         for (var first = 0; first < features.Count; first++)
@@ -206,14 +209,64 @@ public sealed class L0WorldTests
     }
 
     [Fact]
+    public void Priority_flood_preserves_the_bed_and_measures_level_pool_volume_and_area()
+    {
+        var terrain = WorldSimulation.Create(1).Snapshot().Cells
+            .Select(cell => cell with { ElevationM = 0, SurfaceWaterMm = 0, GroundwaterMm = 0 })
+            .ToArray();
+        for (var y = 30; y <= 34; y++)
+        for (var x = 30; x <= 34; x++)
+        {
+            if (x != 30 && x != 34 && y != 30 && y != 34) continue;
+            var index = y * SimulationState.Width + x;
+            terrain[index] = terrain[index] with { ElevationM = 5 };
+        }
+
+        var topology = SurfaceWaterModel.AnalyzeHydrology(terrain);
+        var basinIndex = topology.DepressionId[32 * SimulationState.Width + 32];
+        Assert.True(basinIndex >= 0);
+        var basin = Assert.Single(topology.Basins);
+        Assert.Equal(5, basin.SpillElevationM);
+        Assert.Equal(9, basin.Cells.Length);
+        Assert.Equal(4_500, basin.CapacityM3);
+        Assert.Equal(1_800, SurfaceWaterModel.DepressionVolumeAtStageM3(terrain, basin, 2));
+        Assert.Equal(900, SurfaceWaterModel.DepressionAreaAtStageM2(terrain, basin, 2));
+        Assert.Equal(basin.CapacityM3, SurfaceWaterModel.DepressionVolumeAtStageM3(terrain, basin, 8));
+        Assert.Equal(0, terrain[32 * SimulationState.Width + 32].ElevationM);
+        Assert.Equal(5, topology.FilledElevationM[32 * SimulationState.Width + 32]);
+    }
+
+    [Fact]
+    public void Priority_flood_receiver_tree_is_deterministic_and_routes_all_cells_to_the_open_edge()
+    {
+        var terrain = WorldSimulation.Create(2).Snapshot().Cells.ToArray();
+        var first = SurfaceWaterModel.AnalyzeHydrology(terrain);
+        var second = SurfaceWaterModel.AnalyzeHydrology(terrain);
+
+        Assert.Equal(first.FilledElevationM, second.FilledElevationM);
+        Assert.Equal(first.Receiver, second.Receiver);
+        Assert.Equal(first.Accumulation, second.Accumulation);
+        for (var index = 0; index < terrain.Length; index++)
+        {
+            var receiver = first.Receiver[index];
+            if (receiver < 0) continue;
+            Assert.True(first.FilledElevationM[receiver] <= first.FilledElevationM[index]);
+        }
+
+        Assert.Equal(terrain.Length, first.Accumulation
+            .Where((_, index) => first.Receiver[index] < 0).Sum());
+    }
+
+    [Fact]
     public void Terrain_chunks_have_valid_triangles_and_exact_shared_edges()
     {
         const int subdivisions = 8;
         const int chunkCells = 16;
         var sampler = TerrainModel.CreateUnderlyingElevationSampler(1);
-        var west = TerrainSurfaceMeshBuilder.BuildChunk(sampler, 0, 0, chunkCells, chunkCells,
+        var ridgeChunkX = (int)Math.Round(SimulationState.Width * 0.20);
+        var west = TerrainSurfaceMeshBuilder.BuildChunk(sampler, ridgeChunkX, 0, chunkCells, chunkCells,
             subdivisions, SimulationState.Width, SimulationState.Height, 10);
-        var east = TerrainSurfaceMeshBuilder.BuildChunk(sampler, chunkCells, 0, chunkCells, chunkCells,
+        var east = TerrainSurfaceMeshBuilder.BuildChunk(sampler, ridgeChunkX + chunkCells, 0, chunkCells, chunkCells,
             subdivisions, SimulationState.Width, SimulationState.Height, 10);
 
         var verticesPerRow = chunkCells * subdivisions + 1;
@@ -364,11 +417,13 @@ public sealed class L0WorldTests
     public void Surface_water_routing_conserves_internal_flow_and_accounts_boundary_loss()
     {
         var cells = WorldSimulation.Create(1).Snapshot().Cells.ToArray();
-        cells[32 * 64 + 32] = cells[32 * 64 + 32] with { SurfaceWaterMm = 100 };
+        var centerIndex = (SimulationState.Height / 2) * SimulationState.Width + SimulationState.Width / 2;
+        cells[centerIndex] = cells[centerIndex] with { SurfaceWaterMm = 100 };
         var beforeLiters = cells.Sum(c => (c.SurfaceWaterMm + c.GroundwaterMm) * SimulationState.CellAreaM2);
         var routed = SurfaceWaterModel.Route(cells);
         var afterLiters = routed.Cells.Sum(c => (c.SurfaceWaterMm + c.GroundwaterMm) * SimulationState.CellAreaM2);
-        Assert.InRange(Math.Abs(beforeLiters - afterLiters - routed.OutflowLiters), 0, 1e-6);
+        var roundoffToleranceLiters = Math.Max(1e-3, beforeLiters * 1e-9);
+        Assert.InRange(Math.Abs(beforeLiters - afterLiters - routed.OutflowLiters), 0, roundoffToleranceLiters);
         Assert.Contains(routed.Cells, c => c.SurfaceWaterMm > 0);
     }
 

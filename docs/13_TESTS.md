@@ -30,7 +30,7 @@ Cada teste registra `build`, `worldSeed`, `scenarioVersion`, parâmetros complet
 | T14 | matéria orgânica nova em Soil | consumidor apenas hídrico segue funcionando |
 | T15 | substituição de Soil por outra implementação | não exige editar Atmosphere, Biosphere, Hydrosphere |
 | T16 | salvar/recarregar e seguir | mesma continuação, incluindo RNG, agendas e seres vivos |
-| T17 | render ligado/desligado, zoom e movimento de câmera | estado lógico idêntico no ambiente testado |
+| T17 | render ligado/desligado, projeção, zoom, câmera e carregamento de chunks visuais | estado lógico idêntico; apresentação não consome RNG ecológico nem altera estado |
 | T18 | cenário integrado 2 habitats / 2 plantas / 2 animais | cadeia ambiental e biológica observável por múltiplos ciclos |
 
 ## Regras de aprovação
@@ -68,4 +68,4 @@ O escopo implementado é N0–N2, sem fauna. `dotnet build Game.sln -c Release` 
 
 Smoke runs adicionais avançaram seeds 1, 2 e 3 por 52.560 ticks cada. Isso evidencia execução longa e terminações finitas para essas seeds; não substitui a instrumentação completa de T01–T25 nem validação de campo. Os 19 testes Release também cobrem a variação real de elevação na malha, a continuidade de bordas entre chunks, a geometria dos afloramentos, a drenagem e a distribuição determinística de flora. Na revisão ecológica v13, seeds 1–3 avançaram até o tick 144 e fecharam água, matéria seca e N dentro das tolerâncias registradas em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
 
-A build Release do cliente foi aberta e respondeu com o título `ASTERRA - Temperate Valley (L0)`. A captura `genesis-flora-v17-highland-forest.png` e a medição de 60 s estão fora do repositório no diretório de visualizações do Codex; seed 1, 1280 × 720, aquecimento de 5 s: 3541 quadros, média 59.02 FPS, P95 17.20 ms, P99 45.80 ms, CPU 58.2% de um núcleo e working set 181.5 MiB. A imagem mostra a geometria e os bosques ampliados, mas ainda não alcança a densidade vegetal nem as margens de rio da referência.
+A build Release do cliente foi aberta e respondeu com o título `Temperate Valley (L0)`. A captura `genesis-flora-v17-highland-forest.png` e a medição de 60 s estão fora do repositório no diretório de visualizações do Codex; seed 1, 1280 × 720, aquecimento de 5 s: 3541 quadros, média 59.02 FPS, P95 17.20 ms, P99 45.80 ms, CPU 58.2% de um núcleo e working set 181.5 MiB. A imagem mostra a geometria e os bosques ampliados, mas ainda não alcança a densidade vegetal nem as margens de rio da referência.

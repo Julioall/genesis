@@ -65,7 +65,13 @@ public sealed record TreeRenderProfile(
     int MaximumBranchOrder,
     LeafVerticalPattern LeafVerticalPattern = LeafVerticalPattern.Uniform,
     float PrimaryBranchRadiusRatio = 0.60f,
-    TreeCrownShape CrownShape = TreeCrownShape.Spherical);
+    TreeCrownShape CrownShape = TreeCrownShape.Spherical,
+    float SecondaryLengthRatio = 0.60f,
+    float TertiaryLengthRatio = 0.50f,
+    float TerminalLengthRatio = 0.43f,
+    float GravitySagRatio = 0.07f,
+    float SecondaryDivergenceDegrees = 44f,
+    float TerminalDivergenceDegrees = 38f);
 
 /// <summary>A tapered, connected segment in the tree's camera-independent branch graph.</summary>
 public readonly record struct TreeBranchSegment(
@@ -121,20 +127,30 @@ public static class ProceduralTreeGenerator
         new(0, "temperate-oak", TreeArchitecture.SpreadingBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
             0.43f, 0.96f, 0.39f, 0.026f, 0.36f, 0.32f, 0.02f, 7, 3, 3, 4, 4,
             LeafVerticalPattern.MidCrownMaximum, PrimaryBranchRadiusRatio: 0.66f,
-            CrownShape: TreeCrownShape.Spherical),
+            CrownShape: TreeCrownShape.Spherical, SecondaryLengthRatio: 0.65f,
+            TertiaryLengthRatio: 0.54f, TerminalLengthRatio: 0.45f, GravitySagRatio: 0.13f,
+            SecondaryDivergenceDegrees: 49f, TerminalDivergenceDegrees: 43f),
         new(1, "temperate-pine", TreeArchitecture.ConicalConifer, FoliageMorphology.Needle, LeafHabit.Evergreen,
             0.12f, 0.98f, 0.34f, 0.018f, -0.07f, -0.10f, 0.00f, 20, 2, 2, 2, 4,
-            PrimaryBranchRadiusRatio: 0.48f, CrownShape: TreeCrownShape.Conical),
+            PrimaryBranchRadiusRatio: 0.48f, CrownShape: TreeCrownShape.Conical, SecondaryLengthRatio: 0.58f,
+            TertiaryLengthRatio: 0.48f, TerminalLengthRatio: 0.40f, GravitySagRatio: 0.10f,
+            SecondaryDivergenceDegrees: 37f, TerminalDivergenceDegrees: 31f),
         new(2, "temperate-birch", TreeArchitecture.UprightBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
             0.46f, 0.97f, 0.27f, 0.014f, 0.28f, 0.38f, 0.00f, 6, 3, 3, 4, 4,
             LeafVerticalPattern.LargerTowardCrownBase, PrimaryBranchRadiusRatio: 0.67f,
-            CrownShape: TreeCrownShape.TaperedCylindrical),
+            CrownShape: TreeCrownShape.TaperedCylindrical, SecondaryLengthRatio: 0.60f,
+            TertiaryLengthRatio: 0.47f, TerminalLengthRatio: 0.38f, GravitySagRatio: 0.055f,
+            SecondaryDivergenceDegrees: 42f, TerminalDivergenceDegrees: 35f),
         new(3, "temperate-maple", TreeArchitecture.SpreadingBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
             0.48f, 0.96f, 0.37f, 0.023f, 0.34f, 0.28f, 0.00f, 7, 3, 3, 4, 4,
-            PrimaryBranchRadiusRatio: 0.64f, CrownShape: TreeCrownShape.Spherical),
+            PrimaryBranchRadiusRatio: 0.64f, CrownShape: TreeCrownShape.Spherical, SecondaryLengthRatio: 0.66f,
+            TertiaryLengthRatio: 0.55f, TerminalLengthRatio: 0.46f, GravitySagRatio: 0.12f,
+            SecondaryDivergenceDegrees: 51f, TerminalDivergenceDegrees: 45f),
         new(4, "temperate-willow", TreeArchitecture.WeepingBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
             0.36f, 0.86f, 0.43f, 0.020f, 0.20f, 0.10f, 0.58f, 8, 3, 3, 4, 4,
-            PrimaryBranchRadiusRatio: 0.62f, CrownShape: TreeCrownShape.Hemispherical)
+            PrimaryBranchRadiusRatio: 0.62f, CrownShape: TreeCrownShape.Hemispherical, SecondaryLengthRatio: 0.68f,
+            TertiaryLengthRatio: 0.59f, TerminalLengthRatio: 0.50f, GravitySagRatio: 0.11f,
+            SecondaryDivergenceDegrees: 54f, TerminalDivergenceDegrees: 49f)
     ];
 
     public static IReadOnlyList<TreeRenderProfile> RenderProfiles { get; } = Array.AsReadOnly(Profiles);
@@ -255,7 +271,88 @@ public static class ProceduralTreeGenerator
         if (profile.Foliage == FoliageMorphology.Broadleaf)
             GrowTowardCrownAttractors(profile, height, maturity, seed, detailLevel, primaryTips, branches, foliage);
 
+        ApplyBranchSupport(branches, foliage);
+
         return new ProceduralTreeStructure(profile, height, maturity, branches.ToArray(), foliage.ToArray());
+    }
+
+    private static void ApplyBranchSupport(
+        List<TreeBranchSegment> branches,
+        IReadOnlyList<TreeFoliageSite> foliage)
+    {
+        if (branches.Count == 0 || foliage.Count == 0) return;
+
+        // Estimate the foliage carried by each segment, then accumulate that load toward
+        // the trunk. The square-root ratio is a bounded, pipe-model-inspired presentation
+        // rule: branch bases carrying a larger share of the crown get a stronger junction.
+        var load = new float[branches.Count];
+        foreach (var site in foliage)
+            if ((uint)site.BranchIndex < (uint)load.Length)
+                load[site.BranchIndex] += Math.Max(0.05f, site.Scale * site.Scale);
+        for (var index = branches.Count - 1; index > 0; index--)
+        {
+            var parentIndex = branches[index].ParentIndex;
+            if (parentIndex >= 0) load[parentIndex] += load[index];
+        }
+
+        var sameOrderSuccessor = new int[branches.Count];
+        Array.Fill(sameOrderSuccessor, -1);
+        for (var index = 0; index < branches.Count; index++)
+        {
+            var parentIndex = branches[index].ParentIndex;
+            if (parentIndex >= 0 && branches[parentIndex].Order == branches[index].Order)
+                sameOrderSuccessor[parentIndex] = index;
+        }
+
+        var maximumOrder = branches.Max(branch => branch.Order);
+        var rootsByOrder = new List<int>?[maximumOrder + 1];
+        for (var index = 1; index < branches.Count; index++)
+        {
+            var root = branches[index];
+            // Primary bough radii come directly from the profile. Their load-based
+            // adjustment would change the main silhouette when a lower LOD omits
+            // fine descendants; pipe support remains active for finer branch orders.
+            if (root.Order <= 1 || root.ParentIndex < 0
+                || branches[root.ParentIndex].Order >= root.Order
+                || load[index] <= 0 || load[root.ParentIndex] <= 0)
+                continue;
+            (rootsByOrder[root.Order] ??= []).Add(index);
+        }
+
+        for (var order = 1; order <= maximumOrder; order++)
+        foreach (var rootIndex in rootsByOrder[order] ?? [])
+        {
+            var root = branches[rootIndex];
+            var parent = branches[root.ParentIndex];
+            var parentAxis = parent.End - parent.Start;
+            var axisLengthSquared = parentAxis.LengthSquared();
+            var attachment = axisLengthSquared < 0.000001f
+                ? parent.Start
+                : parent.Start + parentAxis * Math.Clamp(
+                    Vector3.Dot(root.Start - parent.Start, parentAxis) / axisLengthSquared, 0f, 1f);
+            var attachmentFraction = axisLengthSquared < 0.000001f ? 0f
+                : Math.Clamp(Vector3.Dot(attachment - parent.Start, parentAxis) / axisLengthSquared, 0f, 1f);
+            var parentRadius = parent.StartRadius + (parent.EndRadius - parent.StartRadius) * attachmentFraction;
+            var loadShare = Math.Clamp(load[rootIndex] / load[root.ParentIndex], 0f, 1f);
+            var supportedRadius = parentRadius * Math.Min(0.92f, 1.30f * MathF.Sqrt(loadShare));
+            var radiusScale = root.StartRadius <= 0.000001f
+                ? 1f
+                : Math.Clamp(supportedRadius / root.StartRadius, 0.70f, 1.45f);
+            if (Math.Abs(radiusScale - 1f) <= 0.001f) continue;
+
+            var current = rootIndex;
+            var remaining = branches.Count;
+            while (current >= 0 && remaining-- > 0 && branches[current].Order == order)
+            {
+                var segment = branches[current];
+                branches[current] = segment with
+                {
+                    StartRadius = segment.StartRadius * radiusScale,
+                    EndRadius = segment.EndRadius * radiusScale
+                };
+                current = sameOrderSuccessor[current];
+            }
+        }
     }
 
     private static void GrowTowardCrownAttractors(
@@ -347,10 +444,12 @@ public static class ProceduralTreeGenerator
                     continue;
                 }
 
-                var endRadius = Math.Max(tip.Radius * 0.54f, height * 0.001f);
+                var minimumRadius = height * 0.001f;
+                var startRadius = Math.Max(tip.Radius, minimumRadius);
+                var endRadius = Math.Max(startRadius * 0.54f, minimumRadius);
                 var newIndex = branches.Count;
                 branches.Add(new TreeBranchSegment(tip.BranchIndex, tip.Order + 1, tip.Position,
-                    endpoint, tip.Radius, endRadius));
+                    endpoint, startRadius, endRadius));
                 var outwardVector = new Vector3(endpoint.X, 0, endpoint.Z);
                 var newOutward = outwardVector.LengthSquared() < 0.0001f ? tip.Outward : Vector3.Normalize(outwardVector);
                 nextTips.Add(new CrownTip(endpoint, newIndex, endRadius, newOutward, tip.Order + 1));
@@ -393,7 +492,9 @@ public static class ProceduralTreeGenerator
         List<TreeBranchSegment> branches,
         List<TreeFoliageSite> foliage)
     {
-        var droop = profile.BranchDroop * Math.Clamp((order - 1) / (float)Math.Max(1, maximumOrder - 1), 0, 1);
+        startRadius = Math.Max(startRadius, height * 0.0010f);
+        var droop = profile.BranchDroop * Math.Clamp(
+            (order - 1) / (float)Math.Max(1, profile.MaximumBranchOrder - 1), 0, 1);
         direction = Vector3.Normalize(direction - Vector3.UnitY * droop);
         var side = Vector3.Cross(direction, Vector3.UnitY);
         if (side.LengthSquared() < 0.01f) side = Vector3.Cross(direction, Vector3.UnitX);
@@ -401,24 +502,27 @@ public static class ProceduralTreeGenerator
         var normal = Vector3.Normalize(Vector3.Cross(direction, side));
         var bendSide = (Unit(seed, 0x5452454543555256UL, branchKey) - 0.5f) * 0.24f;
         var bendDepth = (Unit(seed, 0x5452454543555244UL, branchKey) - 0.5f) * 0.22f;
+        // Gravity is a presentation-level bending rule, not a force simulation. Its
+        // effect scales with branch order so terminal growth curves more than the scaffold.
+        // Geometry LOD may omit higher branch orders, but must not change the
+        // curvature of woody scaffold that remains visible at every distance.
+        var orderProgress = order / (float)Math.Max(1, profile.MaximumBranchOrder);
+        var gravitySag = length * profile.GravitySagRatio * (0.40f + 0.60f * orderProgress);
         var controlA = start + direction * (length * 0.31f)
             + side * (length * bendSide) + normal * (length * bendDepth * 0.48f)
-            + Vector3.UnitY * (length * profile.LateralBranchUp * 0.035f);
+            + Vector3.UnitY * (length * profile.LateralBranchUp * 0.035f - gravitySag * 0.08f);
         var controlB = start + direction * (length * 0.72f)
             + side * (length * bendSide * 1.24f) - normal * (length * bendDepth * 0.32f)
-            + Vector3.UnitY * (length * profile.LateralBranchUp * 0.11f);
+            + Vector3.UnitY * (length * profile.LateralBranchUp * 0.11f - gravitySag * 0.58f);
         var endpoint = start + direction * length + side * (length * bendSide * 1.48f)
             + normal * (length * bendDepth * 0.30f)
             + Vector3.UnitY * (length * profile.LateralBranchUp * 0.18f)
-            - Vector3.UnitY * (length * droop * 0.34f);
+            - Vector3.UnitY * (length * (droop * 0.34f + profile.GravitySagRatio * (0.40f + 0.60f * orderProgress)));
         var daughterTaper = order == 1 ? 0.50f : order == 2 ? 0.54f : 0.58f;
         var endRadius = Math.Max(startRadius * daughterTaper, height * 0.0010f);
-        var segmentCount = detailLevel switch
-        {
-            0 => 2,
-            1 => order <= 2 ? 3 : 2,
-            _ => order == 1 ? 4 : order == 2 ? 3 : 2
-        };
+        // Keep centerline samples stable across LODs. The renderer reduces radial
+        // sides and branch orders; it does not redraw a different bough curve.
+        var segmentCount = order == 1 ? 4 : order == 2 ? 3 : 2;
         Vector3 PointOnBranch(float t)
         {
             var inverse = 1f - t;
@@ -472,24 +576,44 @@ public static class ProceduralTreeGenerator
             return branchSegments[^1];
         }
 
-        var childCount = order == 1 ? profile.SecondaryBranches : profile.TerminalBranches;
+        var childBaseCount = order == 1 ? profile.SecondaryBranches : profile.TerminalBranches;
         var detailBranchScale = detailLevel switch { 0 => 0.55f, 1 => 0.72f, _ => 1.35f };
-        childCount = Math.Max(1, (int)MathF.Round(childCount * (0.58f + 0.42f * maturity) * detailBranchScale));
+        var matureBranchScale = 0.58f + 0.42f * maturity;
+        var fullDetailChildCount = Math.Max(1,
+            (int)MathF.Round(childBaseCount * matureBranchScale * 1.35f));
+        var childCount = Math.Max(1,
+            (int)MathF.Round(childBaseCount * matureBranchScale * detailBranchScale));
         var branchPhase = Unit(seed, 0x5452454543485048UL, branchKey) * Tau;
         for (var child = 0; child < childCount; child++)
         {
-            var jitter = (Unit(seed, 0x5452454541545441UL, branchKey * 7 + (ulong)child) - 0.5f) * 0.12f;
-            var positionT = childCount == 1 ? 0.70f : Math.Clamp(0.18f + 0.66f * (child + 0.5f) / childCount + jitter, 0.16f, 0.90f);
-            var attachPoint = PointOnBranch(positionT);
-            var attachSegment = Math.Min(segmentCount - 1, (int)(positionT * segmentCount));
+            // Lower LODs select a spread-out subset of the full-detail bud slots.
+            // A branch that survives the reduction keeps its height, azimuth and seed.
+            var childSlot = childCount == 1
+                ? fullDetailChildCount / 2
+                : Math.Clamp((int)MathF.Round(
+                    (child + 0.5f) * fullDetailChildCount / childCount - 0.5f),
+                    0, fullDetailChildCount - 1);
+            var jitter = (Unit(seed, 0x5452454541545441UL, branchKey * 7 + (ulong)childSlot) - 0.5f) * 0.12f;
+            var positionT = Math.Clamp(0.18f + 0.66f * (childSlot + 0.5f) / fullDetailChildCount + jitter,
+                0.16f, 0.90f);
+            var segmentPosition = positionT * segmentCount;
+            var attachSegment = Math.Min(segmentCount - 1, (int)segmentPosition);
+            var attachFraction = Math.Clamp(segmentPosition - attachSegment, 0f, 1f);
             var attachParent = branchSegments[attachSegment];
+            var supportingSegment = branches[attachParent];
+            // Attach to the same sampled centerline that the renderer will mesh. Using
+            // the unsampled Bezier point here can leave a child visibly detached from
+            // the coarser chord when the parent has a strong bend or gravity sag.
+            var attachPoint = Vector3.Lerp(supportingSegment.Start, supportingSegment.End, attachFraction);
             var tangent = Vector3.Normalize(PointOnBranch(Math.Min(1f, positionT + 0.015f))
                 - PointOnBranch(Math.Max(0f, positionT - 0.015f)));
             var branchSideRaw = Vector3.Cross(tangent, Vector3.UnitY);
             var branchSide = branchSideRaw.LengthSquared() < 0.01f ? side : Vector3.Normalize(branchSideRaw);
             var branchNormal = Vector3.Normalize(Vector3.Cross(tangent, branchSide));
-            var azimuthJitter = (Unit(seed, 0x54524545415A494DUL, branchKey * 13 + (ulong)child) - 0.5f) * 0.64f;
-            var azimuth = branchPhase + Tau * (child + 0.5f) / childCount + azimuthJitter;
+            var azimuthJitter = (Unit(seed, 0x54524545415A494DUL, branchKey * 13 + (ulong)childSlot) - 0.5f) * 0.64f;
+            // Buds still occupy stratified positions along each axis, while successive
+            // azimuths follow a phyllotactic sequence instead of forming tiny whorls.
+            var azimuth = branchPhase + childSlot * GoldenAngle + azimuthJitter;
             var lateral = branchSide * MathF.Cos(azimuth) + branchNormal * MathF.Sin(azimuth);
             var outwardBias = profile.Architecture switch
             {
@@ -500,22 +624,42 @@ public static class ProceduralTreeGenerator
             };
             var childUp = profile.LateralBranchUp
                 + (profile.Architecture == TreeArchitecture.ConicalConifer ? 0.20f : 0.04f);
-            var childDirection = Vector3.Normalize(tangent * 0.56f + outward * outwardBias
-                + lateral * 0.42f + Vector3.UnitY * childUp);
-            var childLength = length * (order == 1 ? 0.60f : order == 2 ? 0.50f : 0.43f)
-                * (0.86f + Unit(seed, 0x545245454348494CUL, branchKey * 7 + (ulong)child) * 0.30f);
+            var divergenceDegrees = order == 1
+                ? profile.SecondaryDivergenceDegrees
+                : profile.TerminalDivergenceDegrees;
+            var divergenceRadians = divergenceDegrees * (MathF.PI / 180f);
+            var childDirection = Vector3.Normalize(tangent * MathF.Cos(divergenceRadians)
+                + lateral * MathF.Sin(divergenceRadians) + outward * outwardBias
+                + Vector3.UnitY * childUp);
+            var orderLengthRatio = order switch
+            {
+                1 => profile.SecondaryLengthRatio,
+                2 => profile.TertiaryLengthRatio,
+                _ => profile.TerminalLengthRatio
+            };
+            var childLength = length * orderLengthRatio
+                * (0.86f + Unit(seed, 0x545245454348494CUL, branchKey * 7 + (ulong)childSlot) * 0.30f);
             // A lateral branch takes its thickness from the parent where it actually joins.
             // Using the parent's tip radius for every insertion made proximal branches
             // implausibly thin and left the crown looking like a bundle of wires.
-            var parentRadiusAtAttachment = startRadius * MathF.Pow(endRadius / startRadius, positionT);
+            var parentRadiusAtAttachment = supportingSegment.StartRadius
+                + (supportingSegment.EndRadius - supportingSegment.StartRadius) * attachFraction;
             var daughterRadiusRatio = profile.Architecture == TreeArchitecture.ConicalConifer
                 ? order == 1 ? 0.56f : 0.62f
                 : order == 1 ? 0.60f : 0.66f;
             var daughterVariation = 0.90f
-                + Unit(seed, 0x5452454543485241UL, branchKey * 17 + (ulong)child) * 0.20f;
+                + Unit(seed, 0x5452454543485241UL, branchKey * 17 + (ulong)childSlot) * 0.20f;
             var childRadius = parentRadiusAtAttachment * daughterRadiusRatio * daughterVariation;
-            GrowBranch(attachPoint, childDirection, outward, childLength, childRadius, order + 1,
-                attachParent, profile, height, maturity, seed, branchKey * 11 + (ulong)child + 1,
+
+            // Carry the local horizontal heading into the next order. Reusing the first
+            // bough's radial vector at every depth makes every descendant fan away from
+            // the trunk as if it were an independent primary branch.
+            var childOutward = new Vector3(childDirection.X, 0f, childDirection.Z);
+            childOutward = childOutward.LengthSquared() < 0.0001f
+                ? outward
+                : Vector3.Normalize(Vector3.Lerp(outward, Vector3.Normalize(childOutward), 0.72f));
+            GrowBranch(attachPoint, childDirection, childOutward, childLength, childRadius, order + 1,
+                attachParent, profile, height, maturity, seed, branchKey * 11 + (ulong)childSlot + 1,
                 maximumOrder, detailLevel,
                 branches, foliage);
         }

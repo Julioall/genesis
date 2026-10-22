@@ -59,7 +59,34 @@ public sealed class ProceduralTreeStructureTests
             var parent = tree.Branches[branch.ParentIndex];
             Assert.True(parent.Order < branch.Order);
             Assert.InRange(DistanceToSegment(branch.Start, parent.Start, parent.End), 0f, 0.05f);
-            Assert.True(branch.StartRadius <= RadiusAlongParent(parent, branch.Start) * 1.05f);
+            var parentRadius = RadiusAlongParent(parent, branch.Start);
+            Assert.True(branch.StartRadius <= parentRadius * 1.05f,
+                $"Order {branch.Order} branch {branch.StartRadius:F6} exceeds its parent radius {parentRadius:F6}.");
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void Supported_branch_chains_keep_continuous_tapered_radii(int profileRow)
+    {
+        var tree = ProceduralTreeGenerator.Generate(profileRow, 8f, 1f, 0x51A77UL, detailLevel: 2);
+
+        for (var index = 0; index < tree.Branches.Count; index++)
+        {
+            var branch = tree.Branches[index];
+            Assert.True(branch.StartRadius >= branch.EndRadius);
+            if (branch.ParentIndex < 0) continue;
+
+            var parent = tree.Branches[branch.ParentIndex];
+            if (parent.Order == branch.Order)
+            {
+                Assert.True(System.Numerics.Vector3.DistanceSquared(parent.End, branch.Start) < 0.000001f);
+                Assert.Equal(parent.EndRadius, branch.StartRadius);
+            }
         }
     }
 
@@ -108,6 +135,31 @@ public sealed class ProceduralTreeStructureTests
             coarsePrimaryRoots.Select(branch => branch.Start));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void Primary_bough_centerlines_and_radii_are_identical_across_geometry_lods(int profileRow)
+    {
+        var coarse = ProceduralTreeGenerator.Generate(profileRow, 8f, 1f, 0x10DUL, detailLevel: 0);
+        var medium = ProceduralTreeGenerator.Generate(profileRow, 8f, 1f, 0x10DUL, detailLevel: 1);
+        var detailed = ProceduralTreeGenerator.Generate(profileRow, 8f, 1f, 0x10DUL, detailLevel: 2);
+        var coarseBoughs = PrimaryBoughChains(coarse);
+        var mediumBoughs = PrimaryBoughChains(medium);
+        var detailedBoughs = PrimaryBoughChains(detailed);
+
+        Assert.Equal(detailedBoughs.Length, mediumBoughs.Length);
+        Assert.Equal(detailedBoughs.Length, coarseBoughs.Length);
+        for (var index = 0; index < detailedBoughs.Length; index++)
+        {
+            var detailedGeometry = detailedBoughs[index].Select(GeometrySignature);
+            Assert.Equal(detailedGeometry, mediumBoughs[index].Select(GeometrySignature));
+            Assert.Equal(detailedGeometry, coarseBoughs[index].Select(GeometrySignature));
+        }
+    }
+
     [Fact]
     public void Primary_bough_lengths_follow_the_species_crown_envelope()
     {
@@ -130,6 +182,37 @@ public sealed class ProceduralTreeStructureTests
         Assert.True(Average(sphericalMiddle) > Average(sphericalLow) * 1.35f);
         Assert.True(Average(sphericalMiddle) > Average(sphericalHigh) * 1.35f);
         Assert.True(Average(conicalLow) > Average(conicalHigh) * 1.45f);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void Species_branch_profiles_taper_length_by_order(int profileRow)
+    {
+        var profile = ProceduralTreeGenerator.ProfileForRenderRow(profileRow);
+
+        Assert.InRange(profile.SecondaryLengthRatio, 0.25f, 0.90f);
+        Assert.InRange(profile.TertiaryLengthRatio, 0.20f, 0.85f);
+        Assert.InRange(profile.TerminalLengthRatio, 0.15f, 0.80f);
+        Assert.True(profile.SecondaryLengthRatio > profile.TertiaryLengthRatio);
+        Assert.True(profile.TertiaryLengthRatio > profile.TerminalLengthRatio);
+        Assert.InRange(profile.GravitySagRatio, 0f, 0.25f);
+        Assert.InRange(profile.SecondaryDivergenceDegrees, 20f, 75f);
+        Assert.InRange(profile.TerminalDivergenceDegrees, 20f, 75f);
+    }
+
+    [Fact]
+    public void Branch_length_profiles_differentiate_upright_and_spreading_architectures()
+    {
+        var birch = ProceduralTreeGenerator.ProfileForRenderRow(2);
+        var willow = ProceduralTreeGenerator.ProfileForRenderRow(4);
+
+        Assert.True(birch.TerminalLengthRatio < willow.TerminalLengthRatio);
+        Assert.True(birch.GravitySagRatio < willow.GravitySagRatio);
+        Assert.True(birch.SecondaryDivergenceDegrees < willow.SecondaryDivergenceDegrees);
     }
 
     [Fact]
@@ -165,6 +248,36 @@ public sealed class ProceduralTreeStructureTests
             .Where(branch => branch.Order == 1 && branch.ParentIndex >= 0
                 && tree.Branches[branch.ParentIndex].Order == 0)
             .ToArray();
+
+    private static TreeBranchSegment[][] PrimaryBoughChains(ProceduralTreeStructure tree)
+    {
+        var successors = new int[tree.Branches.Count];
+        Array.Fill(successors, -1);
+        for (var index = 0; index < tree.Branches.Count; index++)
+        {
+            var parentIndex = tree.Branches[index].ParentIndex;
+            if (parentIndex >= 0 && tree.Branches[parentIndex].Order == tree.Branches[index].Order)
+                successors[parentIndex] = index;
+        }
+
+        var chains = new List<TreeBranchSegment[]>();
+        for (var index = 0; index < tree.Branches.Count; index++)
+        {
+            var branch = tree.Branches[index];
+            if (branch.Order != 1 || branch.ParentIndex < 0 || tree.Branches[branch.ParentIndex].Order != 0)
+                continue;
+
+            var chain = new List<TreeBranchSegment>();
+            for (var current = index; current >= 0; current = successors[current])
+                chain.Add(tree.Branches[current]);
+            chains.Add(chain.ToArray());
+        }
+        return chains.ToArray();
+    }
+
+    private static (int Order, System.Numerics.Vector3 Start, System.Numerics.Vector3 End,
+        float StartRadius, float EndRadius) GeometrySignature(TreeBranchSegment branch)
+        => (branch.Order, branch.Start, branch.End, branch.StartRadius, branch.EndRadius);
 
     private static void CollectPrimaryBoughs(
         ProceduralTreeStructure tree,

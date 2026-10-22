@@ -1,33 +1,29 @@
-# Plataforma, MonoGame e a decisão web antes do investimento irreversível
+# Avaliação de plataforma e gate web no MonoGame
 
-## Situação verificada em 21/10/2026
+**Status:** MonoGame é a stack obrigatória; desktop é o primeiro alvo de referência e suporte a navegador continua em avaliação.
 
-MonoGame documenta oficialmente Windows, macOS, Linux, Android e iOS. A proposta `MonoGame.Web` oficial continua em desenvolvimento conforme GitHub issue #9515 (aberta em 26/08/2026). Portanto, **não existe evidência suficiente para prometer a versão browser no mesmo nível do desktop apenas por escolher MonoGame**.
+## Princípios
 
-Fontes:
-- https://docs.monogame.net/articles/getting_started/platforms.html
-- https://github.com/MonoGame/MonoGame/issues/9515
-- https://monogame.net/
+- O core C# e os módulos científicos continuam headless e independentes de MonoGame, câmera, GPU e UI.
+- O cliente usa MonoGame. As opções de apresentação e os critérios técnicos estão em [direção visual e técnicas de apresentação](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md).
+- A lista de plataformas documentadas não substitui evidência: é necessário compilar, executar, medir e registrar cada alvo que o projeto pretende prometer.
+- Suporte web é um gate separado da escolha visual. A existência de uma rota de plataforma não implica que o core compartilhado, threading, memória, shaders ou desempenho sejam adequados no browser.
 
-## Estratégia
+## Avaliação de plataforma
 
-1. Usar o núcleo e os domínios já exercitados em N0/N1, compiláveis e testáveis **sem MonoGame**; o spike não exige criar todos os projetos previstos.
-2. Construir cliente desktop simples com MonoGame para visualizar mundo e desempenho real.
-3. Durante N0/N1, elaborar spike web com mesmo core: criar mundo, avançar ticks, renderizar mapa simples, registrar input e executar no browser real com logs e limitações. Confirmar no momento se rota oficial MonoGame.Web, KNI ou adaptador alternativo é adequada.
-4. No spike, verificar boot, ticks e representação mínima; registrar limitações encontradas. Input completo, memória, threads/WASM, shaders/atlas, bundle, save e profiling são critérios de uma futura entrega web, não bloqueadores de N0. Preferir a simulação compartilhada a reescrever as regras.
-5. Decidir Go/No-Go web com evidências: build reproduzível, navegador alvo, desempenho, manutenção e custo de portabilidade. Bloqueio documentado impede afirmação pública de multiplataforma completa, não a evolução do desktop.
+1. Usar o mesmo snapshot, conteúdo procedural, enquadramento e carga da cena demonstrativa ao comparar técnicas de apresentação no MonoGame; manter a suite científica e o runner headless independentes.
+2. Verificar build de desenvolvimento e distribuição, input, persistência, janelas/telas, logs, profiling e operação em Release nos sistemas pretendidos.
+3. Para web, provar compilação do core, ciclo de ticks, representação mínima, input, save/load, memória, threading/WASM, shaders, tamanho do bundle e profiling em navegadores reais. Registrar browser, versão, sistema e hardware.
+4. Medir diferenças de plataforma sem mudar equações ou regras para contornar limitações de MonoGame. A apresentação pode variar se mantiver os mesmos dados e comportamento simulado.
+5. Revalidar documentação, licenças e dependências no momento de implementar o spike. Versões e suporte de plataformas mudam.
 
-## Critérios de comparação
+## Condições conhecidas para o próximo spike
 
-- Código C# compartilhado sem `#if` dominando módulos.
-- Disponibilidade e licença de bibliotecas de render.
-- Limites de memória/threads de browser e integração com .NET/WASM.
-- Capacidade de gerar texturas/atlas procedural sem arquivos artísticos externos.
-- Performance com 1, 100 e 1000 organismos visíveis, mapa e clima ativos.
-- Ferramentas CI e rotina de testes automáticos aplicáveis ao browser.
+- A plataforma web do MonoGame exige verificação própria; a existência de APIs gráficas 2D/3D não comprova exportação funcional do jogo para browser.
+- O spike deve validar o ciclo headless, apresentação MonoGame, input, save/load, memória, threading/WASM, shaders, tamanho do bundle e profiling em navegadores reais. Registrar navegador, versão, sistema e hardware.
 
-Nunca alterar a fundamentação científica documental ou os domínios para satisfazer incidentalmente um navegador antes de tentar adaptadores.
+Fontes primárias consultadas em 21/10/2026: [plataformas MonoGame](https://docs.monogame.net/articles/getting_started/platforms.html) e [proposta da plataforma web MonoGame #9515](https://github.com/MonoGame/MonoGame/issues/9515). Estes registros descrevem limites documentados, não a compatibilidade do produto.
 
-## Orçamento da avaliação inicial
+## Decisão de plataforma
 
-O spike N0/N1 tem limite proposto de um dia de trabalho. Ao atingir o limite, registrar evidências, lacunas e Go/No-Go/inconclusivo; não iniciar segundo cliente completo. Benchmarks de 1/100/1000 organismos são comparação posterior quando houver runtime suficiente, não pré-requisito para boot de N0. Verificar novamente o suporte oficial quando a implementação começar.
+Manter desktop como primeiro alvo de referência e testar a web cedo para evitar dependências irreversíveis. Até que o spike produza evidência, classificar suporte web como inconclusivo e não anunciar portabilidade. Ausência de suporte web não invalida os testes headless ou a evolução desktop em MonoGame; a prioridade de plataformas é independente da escolha de stack.

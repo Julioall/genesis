@@ -2,7 +2,7 @@
 
 > Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
 
-Pesquisa comparativa e mudanças da iteração 43: [referências de geração procedural de árvores](../reports/PROCEDURAL_TREE_REPOSITORY_RESEARCH_ITERATION_43_2026-10-22.md).
+Pesquisa comparativa: [referências de geração procedural de árvores — iteração 43](../reports/PROCEDURAL_TREE_REPOSITORY_RESEARCH_ITERATION_43_2026-10-22.md). Evolução das junções: [iteração 44](../reports/PROCEDURAL_TREE_BRANCH_JUNCTIONS_ITERATION_44_2026-10-22.md).
 
 **Status:** primeira etapa estrutural implementada no cliente desktop MonoGame. Este documento descreve o protótipo de árvores tridimensionais existente; a técnica visual final continua em validação dentro da stack confirmada. A decisão e os critérios estão em [ADR-0004](../decisions/ADR-0004-visual-direction-and-renderer-evaluation.md). As árvores têm um grafo estrutural determinístico separado da malha MonoGame. Os cinco perfis de carvalho, pinheiro, bétula, bordo e salgueiro são arquétipos de forma temperada para o protótipo, não espécies calibradas nem dados botânicos validados.
 
@@ -29,7 +29,7 @@ As seeds visuais derivam da seed do mundo e da célula, sem consumir o fluxo ale
 | Bordo | Galhos distribuídos por níveis e copa arredondada |
 | Salgueiro | Copa ampla com inclinação pendente nos ramos distais |
 
-As ramificações usam níveis de ordem crescente, afunilamento e curvaturas determinísticas. Segmentos contíguos da mesma ordem agora compartilham uma malha varrida com seção transversal transportada ao longo da curva. A relação entre raio do tronco e raio dos galhos primários é configurável por perfil; o renderer alarga a primeira seção do galho, interpola uma expansão curta no tronco em cada inserção primária e afina as pontas. O custo medido aumentou 2,6% na galeria isolada de cinco árvores. Os pontos foliares ficam nos ramos secundários e terminais. As bifurcações ainda combinam tubos separados; a malha não funde os ramos nos nós e as interseções continuam visíveis de perto.
+As ramificações usam níveis de ordem crescente, afunilamento e curvaturas determinísticas. Segmentos contíguos da mesma ordem compartilham uma malha varrida com seção transversal transportada ao longo da curva. A relação entre raio do tronco e raio dos galhos primários é configurável por perfil; o renderer alarga a primeira seção do galho e interpola uma expansão curta no tronco e nos galhos primários onde brotos maiores se inserem. Galhos finos mantêm conexões tubulares simples para limitar o crescimento da malha. Os pontos foliares ficam nos ramos secundários e terminais. Os tubos ainda não se fundem topologicamente nos nós; os colares suavizam a leitura das junções maiores, mas interseções continuam visíveis de perto. A iteração 44 registrou 212.952 vértices de galhos para cinco árvores na vista isolada; não houve medição de FPS.
 
 ## Limites declarados
 

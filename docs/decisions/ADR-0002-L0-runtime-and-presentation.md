@@ -1,7 +1,9 @@
 # ADR-0002 — composição headless L0 e apresentação MonoGame
 
-- **Status:** aceita
+- **Status:** princípios científicos e stack MonoGame vigentes; restrições visuais antigas atualizadas por ADR-0004
 - **Data:** 21/10/2026
+
+> Este registro preserva a decisão e o contexto da implementação inicial. ADR-0004 reafirma MonoGame como stack obrigatória e atualiza as opções de câmera e estilo; composição headless, snapshots e isolamento da simulação permanecem vigentes.
 
 ## Contexto
 
@@ -15,7 +17,7 @@ O contrato documental propõe uma implementação incremental em C#, com estado 
 - Gerar silhuetas e pixels por código em cache da sessão. Variações visuais são derivadas por uma função separada da seed ecológica. Sazonalidade de folhas é somente aparência; não representa estoque de folhas nem altera a simulação.
 - Rochas visuais são uma composição determinística baseada em elevação e variação visual; não representam estoque geológico L0, colisão nem recurso mineral.
 - Não incluir fauna, nem classes de fase futura. A documentação biológica permanece como intenção futura do roadmap.
-- Aplicar valores e unidades da ficha versionada `temperate-valley-l0-v15`.
+- Aplicar valores e unidades da ficha versionada `temperate-valley-l0-v17`.
 
 ## Alternativas consideradas
 

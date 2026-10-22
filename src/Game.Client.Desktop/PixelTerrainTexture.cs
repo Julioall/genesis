@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 
 namespace Game.Client.Desktop;
 
-/// <summary>Builds a pixel-art surface from the authoritative L0 grid without changing it.</summary>
+/// <summary>Builds a presentation-only terrain albedo from the authoritative L0 grid.</summary>
 internal static class PixelTerrainTexture
 {
     private static readonly (int X, int Y)[] GrassNeighbors =
@@ -12,7 +12,8 @@ internal static class PixelTerrainTexture
         (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)
     ];
 
-    public static Color[] Generate(WorldSnapshot world, int pixelsPerCell, int overlayMode, Season visualSeason)
+    public static Color[] Generate(WorldSnapshot world, int pixelsPerCell, int overlayMode, Season visualSeason,
+        bool naturalMaterial = false, bool bakeLighting = true)
     {
         if (pixelsPerCell < 1) throw new ArgumentOutOfRangeException(nameof(pixelsPerCell));
         var width = world.Width * pixelsPerCell;
@@ -26,6 +27,9 @@ internal static class PixelTerrainTexture
         var soilCapacity = new double[cellCount];
         var nitrogen = new double[cellCount];
         var woody = new double[cellCount];
+        var drySurface = new double[cellCount];
+        var marshBiome = new double[cellCount];
+        var visualBiomes = naturalMaterial ? VisualBiomeField.Build(world) : null;
         for (var i = 0; i < cellCount; i++)
         {
             var cell = world.Cells[i];
@@ -36,9 +40,27 @@ internal static class PixelTerrainTexture
             soilCapacity[i] = cell.SoilCapacityMm;
             nitrogen[i] = cell.MineralNitrogenGPerM2;
             woody[i] = cell.Woody.Present ? cell.Woody.BiomassGPerM2 : 0;
+            if (visualBiomes is not null)
+            {
+                drySurface[i] = visualBiomes[i].DrySurface;
+                marshBiome[i] = visualBiomes[i].Marsh;
+            }
+        }
+        if (naturalMaterial)
+        {
+            var flatlandLevel = (elevationGrid.Min() + elevationGrid.Max()) * 0.5 - 12;
+            for (var y = 0; y < world.Height; y++)
+            for (var x = 0; x < world.Width; x++)
+            {
+                var index = y * world.Width + x;
+                elevationGrid[index] = VisualBiomeField.FlattenForPresentation(world.Seed,
+                    x + 0.5, y + 0.5, world.Width, world.Height, elevationGrid[index], flatlandLevel);
+            }
         }
         grass = SmoothCoverage(grass, world.Width, world.Height);
-        var grassAutotile = BuildGrassAutotile(world, detail: Math.Min(8, pixelsPerCell));
+        var grassAutotile = naturalMaterial
+            ? (GrassAutotileField?)null
+            : BuildGrassAutotile(world, detail: Math.Min(8, pixelsPerCell));
         var minimumElevation = elevationGrid.Min();
         var elevationRange = Math.Max(1, elevationGrid.Max() - minimumElevation);
         var surfaceTone = new double[cellCount];
@@ -48,14 +70,20 @@ internal static class PixelTerrainTexture
             surfaceTone[i] = sandy[i] * 0.72 + relativeElevation * 0.28;
         }
         surfaceTone = SmoothSurfaceTone(surfaceTone, world.Width, world.Height);
-        var lighting = CalculateLighting(elevationGrid, world.Width, world.Height, 10);
+        var landformElevation = naturalMaterial
+            ? SmoothSurfaceTone((double[])elevationGrid.Clone(), world.Width, world.Height)
+            : elevationGrid;
+        var naturalPalette = naturalMaterial
+            ? BuildNaturalSurfacePalette(elevationGrid, landformElevation, grass, soilWater, soilCapacity, woody, sandy,
+                drySurface, marshBiome, world.Width, world.Height, minimumElevation, elevationRange)
+            : null;
+        var lighting = bakeLighting ? CalculateLighting(elevationGrid, world.Width, world.Height, 10) : null;
 
-        var macro = new ValueNoise(world.Seed, width, height, 128, 0x4D4143524FUL);
-        var middle = new ValueNoise(world.Seed, width, height, 38, 0x4D4944444CUL);
-        var grain = new ValueNoise(world.Seed, width, height, 4, 0x475241494EUL);
-        var season = visualSeason;
-
-        for (var py = 0; py < height; py++)
+        var macro = new ValueNoise(world.Seed, width, height, Math.Max(1, (int)Math.Round(12.8 * pixelsPerCell)), 0x4D4143524FUL);
+        var middle = new ValueNoise(world.Seed, width, height, Math.Max(1, (int)Math.Round(3.8 * pixelsPerCell)), 0x4D4944444CUL);
+        var grain = new ValueNoise(world.Seed, width, height, Math.Max(1, (int)Math.Round(0.4 * pixelsPerCell)), 0x475241494EUL);
+        Parallel.For(0, height, py =>
+        {
         for (var px = 0; px < width; px++)
         {
             var gx = Math.Clamp(px / (double)pixelsPerCell - 0.5, 0, world.Width - 1);
@@ -69,63 +97,93 @@ internal static class PixelTerrainTexture
             var grassValue = Sample(grass, world.Width, world.Height, gx, gy);
             var soilWaterValue = Sample(soilWater, world.Width, world.Height, gx, gy);
             var soilCapacityValue = Sample(soilCapacity, world.Width, world.Height, gx, gy);
+            var drySurfaceValue = naturalMaterial ? Sample(drySurface, world.Width, world.Height, gx, gy) : 0;
             var nitrogenValue = Sample(nitrogen, world.Width, world.Height, gx, gy);
+            var marshValue = naturalMaterial ? Sample(marshBiome, world.Width, world.Height, gx, gy) : 0;
 
             var broad = macro.Sample(px, py);
             var medium = middle.Sample(px, py);
             var fine = grain.Sample(px, py);
+            var plantNoise = (float)((broad - 0.5) * 0.36 + (medium - 0.5) * 0.30 + (fine - 0.5) * 0.14);
             tone = Math.Clamp(tone + (broad - 0.5) * 0.12, 0, 1);
             var fleck = fine < 0.18 ? -0.07 : fine > 0.88 ? 0.06 : 0;
-            var texture = (broad - 0.5) * 0.20 + (medium - 0.5) * 0.14 + fleck;
-            var hillshade = 0.58 + 0.42 * Sample(lighting, world.Width, world.Height, gx, gy);
+            var texture = naturalMaterial
+                ? (broad - 0.5) * 0.28 + (medium - 0.5) * 0.22 + (fine - 0.5) * 0.08 + fleck * 1.15
+                : (broad - 0.5) * 0.20 + (medium - 0.5) * 0.14 + fleck;
+            var hillshade = lighting is null
+                ? 1.0
+                : 0.58 + 0.42 * Sample(lighting, world.Width, world.Height, gx, gy);
             var elevation = Math.Clamp((heightM - minimumElevation) / elevationRange, 0, 1);
             var slope = Math.Sqrt(eastDelta * eastDelta + northDelta * northDelta) / 10;
             var rockThreshold = 0.25 + (broad - 0.5) * 0.12 + (medium - 0.5) * 0.10;
             var rockExposure = SmoothStep(rockThreshold, rockThreshold + 0.38, slope) * 0.56;
+            var steepRockExposure = SmoothStep(0.20, 0.68, slope);
+            if (naturalMaterial) rockExposure = Math.Max(rockExposure, steepRockExposure * 0.86);
             var soilMoisture = (float)Math.Clamp(soilWaterValue / Math.Max(1, soilCapacityValue), 0, 1);
 
-            var soil = Mix(new Color(86, 108, 64), new Color(142, 133, 94), (float)Math.Clamp(tone, 0, 1));
-            soil = Mix(soil, new Color(116, 112, 96), (float)rockExposure);
+            var soil = naturalPalette is not null
+                ? Sample(naturalPalette, world.Width, world.Height, gx, gy)
+                : Mix(new Color(86, 108, 64), new Color(142, 133, 94), (float)Math.Clamp(tone, 0, 1));
+            if (naturalMaterial)
+            {
+                soil = Mix(soil, new Color(178, 157, 116), (float)(drySurfaceValue * 0.20));
+                soil = Mix(soil, new Color(69, 105, 73), (float)(marshValue * 0.62));
+            }
+            var rockColor = naturalMaterial
+                ? Mix(new Color(151, 142, 119), new Color(115, 120, 112),
+                    (float)Math.Clamp(medium * 0.56 + fine * 0.44, 0, 1))
+                : new Color(116, 112, 96);
+            soil = Mix(soil, rockColor, (float)rockExposure);
             soil = Mix(soil, new Color(66, 86, 57), soilMoisture * 0.18f);
             soil = Modulate(soil, hillshade + texture);
 
-            var grassX = Math.Clamp(px * grassAutotile.Detail / pixelsPerCell, 0, grassAutotile.Width - 1);
-            var grassY = Math.Clamp(py * grassAutotile.Detail / pixelsPerCell, 0, grassAutotile.Height - 1);
-            var grassIndex = grassY * grassAutotile.Width + grassX;
-            var neighborCount = CountNeighbors(grassAutotile.NeighborMasks[grassIndex]);
             var biomassStrength = (float)Math.Clamp(grassValue / 0.82, 0, 1);
-            var grassCover = grassAutotile.States[grassIndex] == 0
-                ? 0
-                : (0.48f + neighborCount * 0.045f) * (0.78f + biomassStrength * 0.22f);
-            if (grassCover > 0)
+            float grassCover;
+            if (naturalMaterial)
             {
-                var mask = grassAutotile.NeighborMasks[grassIndex];
-                var pixelStartX = grassX * pixelsPerCell / grassAutotile.Detail;
-                var pixelEndX = (grassX + 1) * pixelsPerCell / grassAutotile.Detail;
-                var pixelStartY = grassY * pixelsPerCell / grassAutotile.Detail;
-                var pixelEndY = (grassY + 1) * pixelsPerCell / grassAutotile.Detail;
-                var localX = px - pixelStartX;
-                var localY = py - pixelStartY;
-                if ((localX == 0 && localY == 0 && NeedsCornerCut(mask, 0, 6, 7))
-                    || (px == pixelEndX - 1 && localY == 0 && NeedsCornerCut(mask, 0, 2, 1))
-                    || (localX == 0 && py == pixelEndY - 1 && NeedsCornerCut(mask, 4, 6, 5))
-                    || (px == pixelEndX - 1 && py == pixelEndY - 1 && NeedsCornerCut(mask, 4, 2, 3)))
-                    grassCover = 0;
+                // Break up coarse biomass into seed-stable plant patches at several scales.
+                // Noise is gated by measured grass biomass, so it changes the material boundary
+                // without painting vegetation into cells where the snapshot has none.
+                var patternedGrass = Math.Clamp(grassValue + plantNoise * biomassStrength * 0.58f, 0, 0.82);
+                grassCover = (float)(SmoothStep(0.10, 0.66, patternedGrass) * (0.70 + biomassStrength * 0.14));
+                grassCover *= 1 - (float)steepRockExposure * 0.72f;
             }
-            var grassColor = season switch
+            else
             {
-                Season.Spring => new Color(128, 158, 81),
-                Season.Summer => new Color(105, 137, 68),
-                Season.Autumn => new Color(153, 143, 71),
-                _ => new Color(102, 112, 77)
-            };
-            grassColor = Mix(grassColor, new Color(91, 132, 65), soilMoisture * 0.20f);
+                var autotile = grassAutotile!.Value;
+                var grassX = Math.Clamp(px * autotile.Detail / pixelsPerCell, 0, autotile.Width - 1);
+                var grassY = Math.Clamp(py * autotile.Detail / pixelsPerCell, 0, autotile.Height - 1);
+                var grassIndex = grassY * autotile.Width + grassX;
+                var neighborCount = CountNeighbors(autotile.NeighborMasks[grassIndex]);
+                grassCover = autotile.States[grassIndex] == 0
+                    ? 0
+                    : (0.48f + neighborCount * 0.045f) * (0.78f + biomassStrength * 0.22f);
+                if (grassCover > 0)
+                {
+                    var mask = autotile.NeighborMasks[grassIndex];
+                    var pixelStartX = grassX * pixelsPerCell / autotile.Detail;
+                    var pixelEndX = (grassX + 1) * pixelsPerCell / autotile.Detail;
+                    var pixelStartY = grassY * pixelsPerCell / autotile.Detail;
+                    var pixelEndY = (grassY + 1) * pixelsPerCell / autotile.Detail;
+                    var localX = px - pixelStartX;
+                    var localY = py - pixelStartY;
+                    if ((localX == 0 && localY == 0 && NeedsCornerCut(mask, 0, 6, 7))
+                        || (px == pixelEndX - 1 && localY == 0 && NeedsCornerCut(mask, 0, 2, 1))
+                        || (localX == 0 && py == pixelEndY - 1 && NeedsCornerCut(mask, 4, 6, 5))
+                        || (px == pixelEndX - 1 && py == pixelEndY - 1 && NeedsCornerCut(mask, 4, 2, 3)))
+                        grassCover = 0;
+                }
+            }
+            var grassColor = new Color(76, 128, 58);
             // The autotile supplies living blades; this softer pigment pass only blends ground
             // material between adjacent biomass cells and does not create extra plant cohorts.
             var cover = (float)(grassCover * (1 - elevation * 0.16));
             var surface = Mix(soil, Modulate(grassColor, hillshade + texture * 0.65f), cover);
-            var groundPigment = biomassStrength * 0.14f;
-            surface = Mix(surface, Modulate(new Color(82, 108, 57), hillshade + texture * 0.35f), groundPigment);
+            var plantMottle = Math.Clamp(0.50f + plantNoise, 0, 1);
+            var groundPigment = biomassStrength * (naturalMaterial ? 0.18f + plantMottle * 0.16f : 0.14f)
+                * (naturalMaterial ? 1 - (float)steepRockExposure * 0.78f : 1f);
+            var groundPigmentColor = naturalMaterial ? new Color(74, 105, 52) : new Color(82, 108, 57);
+            surface = Mix(surface, Modulate(groundPigmentColor, hillshade + texture * 0.35f), groundPigment);
 
             if (overlayMode == 1)
             {
@@ -142,6 +200,7 @@ internal static class PixelTerrainTexture
 
             pixels[py * width + px] = surface;
         }
+        });
 
         return pixels;
     }
@@ -221,6 +280,19 @@ internal static class PixelTerrainTexture
         return top + (bottom - top) * ty;
     }
 
+    private static Color Sample(Color[] values, int width, int height, double x, double y)
+    {
+        x = Math.Clamp(x, 0, width - 1);
+        y = Math.Clamp(y, 0, height - 1);
+        var x0 = (int)x;
+        var y0 = (int)y;
+        var x1 = Math.Min(width - 1, x0 + 1);
+        var y1 = Math.Min(height - 1, y0 + 1);
+        var top = Color.Lerp(values[y0 * width + x0], values[y0 * width + x1], (float)(x - x0));
+        var bottom = Color.Lerp(values[y1 * width + x0], values[y1 * width + x1], (float)(x - x0));
+        return Color.Lerp(top, bottom, (float)(y - y0));
+    }
+
     private static double[] SmoothCoverage(double[] source, int width, int height)
     {
         for (var pass = 0; pass < 2; pass++)
@@ -264,6 +336,84 @@ internal static class PixelTerrainTexture
             var index = y * width + x;
             smoothed[index] = source[index] * 0.25 + weighted / 256 * 0.75;
         }
+        return smoothed;
+    }
+
+    private static Color[] BuildNaturalSurfacePalette(
+        double[] elevations,
+        double[] landformElevations,
+        double[] grass,
+        double[] soilWater,
+        double[] soilCapacity,
+        double[] woody,
+        double[] sandy,
+        double[] drySurface,
+        double[] marshBiome,
+        int width,
+        int height,
+        double minimumElevation,
+        double elevationRange)
+    {
+        var colors = new Color[elevations.Length];
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            var index = y * width + x;
+            var west = elevations[y * width + Math.Max(0, x - 1)];
+            var east = elevations[y * width + Math.Min(width - 1, x + 1)];
+            var north = elevations[Math.Max(0, y - 1) * width + x];
+            var south = elevations[Math.Min(height - 1, y + 1) * width + x];
+            var slope = Math.Sqrt(Math.Pow((east - west) * 0.5, 2) + Math.Pow((south - north) * 0.5, 2)) / 10;
+            var relativeElevation = (landformElevations[index] - minimumElevation) / elevationRange;
+            var upland = SmoothStep(0.64, 0.82, relativeElevation);
+            var highland = SmoothStep(0.79, 0.96, relativeElevation);
+            var exposed = SmoothStep(0.22, 0.64, slope);
+            var wetness = Math.Clamp(soilWater[index] / Math.Max(1, soilCapacity[index]), 0, 1);
+            var woodland = 1 - Math.Exp(-Math.Max(0, woody[index]) / 420);
+            var meadow = SmoothStep(0.08, 0.60, grass[index]);
+
+            var color = Mix(new Color(105, 125, 69), new Color(156, 143, 105),
+                (float)Math.Clamp(sandy[index] * 0.58 + relativeElevation * 0.18, 0, 0.76));
+            color = Mix(color, new Color(90, 116, 66), (float)(SmoothStep(0.10, 0.72, woodland) * 0.28));
+            color = Mix(color, new Color(98, 136, 68), (float)(meadow * 0.20));
+            color = Mix(color, new Color(87, 112, 79), (float)(wetness * (1 - exposed * 0.45) * 0.20));
+            color = Mix(color, new Color(143, 138, 113), (float)(upland * 0.20 + highland * 0.27));
+            color = Mix(color, new Color(137, 132, 111), (float)(exposed * 0.40));
+            color = Mix(color, new Color(178, 157, 116), (float)(drySurface[index] * 0.24));
+            color = Mix(color, new Color(69, 105, 73), (float)(marshBiome[index] * 0.64));
+            colors[index] = color;
+        }
+
+        return SmoothSurfacePalette(colors, width, height);
+    }
+
+    private static Color[] SmoothSurfacePalette(Color[] source, int width, int height)
+    {
+        ReadOnlySpan<int> weights = [1, 4, 6, 4, 1];
+        var smoothed = new Color[source.Length];
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            var red = 0.0;
+            var green = 0.0;
+            var blue = 0.0;
+            for (var oy = -2; oy <= 2; oy++)
+            for (var ox = -2; ox <= 2; ox++)
+            {
+                var sampleX = Math.Clamp(x + ox, 0, width - 1);
+                var sampleY = Math.Clamp(y + oy, 0, height - 1);
+                var color = source[sampleY * width + sampleX];
+                var weight = weights[oy + 2] * weights[ox + 2];
+                red += color.R * weight;
+                green += color.G * weight;
+                blue += color.B * weight;
+            }
+
+            var index = y * width + x;
+            var blurred = new Color((int)Math.Round(red / 256), (int)Math.Round(green / 256), (int)Math.Round(blue / 256));
+            smoothed[index] = Color.Lerp(source[index], blurred, 0.42f);
+        }
+
         return smoothed;
     }
 

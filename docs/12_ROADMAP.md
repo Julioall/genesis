@@ -8,7 +8,7 @@ Os marcos N0–N4 são **internos**. Só declare **MVP Natural aprovado** quando
 | N1 — Física | Cosmos, Atmosphere, Geosphere, Hydrosphere integrados: dia/noite, chuva, temperatura, relevo, solos, água superficial em poças/depressões e saída de borda, infiltração/evaporação | conservação hídrica, resposta à chuva/seca, campos inspecionáveis, determinismo e primeira prova de save/load; conclusão do spike web ou bloqueio/inconclusivo documentado |
 | N2 — Botânica/Ecologia | 2 grupos vegetais, estados/biomassa/sementes, resposta água/luz/N, serapilheira e decompositores agregados | biomassa/ciclo de N auditáveis; plantas crescem e morrem em habitats distintos; save preserva novos estoques |
 | N3 — Fauna | herbívoro, predador, movimento, competição, consumo finito, metabolismo/custos, reprodução e morte | cadeias alimentares e retorno de detritos sem criação gratuita; cenário de extinção possível; save preserva fauna/agenda |
-| N4 — Visual/Integração | cliente MonoGame top-down, sprites e mapa procedural-only, camadas de diagnóstico, pausa/velocidade, save/load, cenário persistente, demonstração de cadeia completa | gate integrado, métricas CPU/FPS/RAM, reprodução por seed e documentação de limitações |
+| N4 — Visual/Integração | cliente MonoGame com técnica visual definida pelo gate, mundo procedural alinhado à referência, camadas de diagnóstico, pausa/velocidade, save/load, cenário persistente, demonstração de cadeia completa | gate integrado, critérios visuais e métricas CPU/GPU/FPS/RAM, reprodução por seed e documentação de limites e plataformas |
 
 ## Artefatos a cada marco
 
@@ -24,7 +24,11 @@ Antes de implementar um processo, fechar sua ficha quantitativa usando [20_L0_MO
 
 ## Primeiro cenário de referência
 
-Usar o cenário versionado `temperate-valley-l0-v15` definido em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md), sem usar nome do jogo: cordilheiras geométricas ramificadas, afloramentos com desnível físico, vale úmido, drenagem, manchas reprodutíveis de gramíneas e árvores ou arbustos, herbívoros simples e predadores. Dimensões e duração são parâmetros de teste, não promessas de escala. Comparar 3 sementes diagnósticas para validar variação e 1 seed canônica para regressão; ampliá-las antes de afirmar robustez.
+Usar o cenário versionado `temperate-valley-l0-v17` definido em [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md), sem usar nome do jogo: cordilheiras geométricas ramificadas, afloramentos com desnível físico, vale úmido, depressões e soleiras hidrológicas separadas do leito original, manchas reprodutíveis de gramíneas e árvores ou arbustos, herbívoros simples e predadores. Dimensões e duração são parâmetros de teste, não promessas de escala. Comparar 3 sementes diagnósticas para validar variação e 1 seed canônica para regressão; ampliá-las antes de afirmar robustez.
+
+## Gate visual antes de fechar N4
+
+MonoGame é a stack obrigatória e não está em avaliação. Antes de fechar câmera e técnica visual, executar no cliente MonoGame a cena comparativa e os critérios de [direção visual e técnicas de apresentação](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md). Preservar N0–N3 e os contratos quantitativos; a validação pode ocorrer em paralelo à evolução científica. Se a prova atrasar, manter a técnica de apresentação em aberto e não redefinir parâmetros físicos ou biológicos para favorecer uma abordagem gráfica.
 
 ## A primeira entrega não precisa incluir
 

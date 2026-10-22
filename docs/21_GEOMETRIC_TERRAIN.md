@@ -1,8 +1,12 @@
-# Terreno geométrico 2.5D
+# Terreno geométrico e protótipo visual atual
+
+> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
+
+**Status:** histórico técnico do terreno e do cliente existente. MonoGame permanece a stack obrigatória; as especificações de câmera, sprites e projeção abaixo descrevem protótipos anteriores, não requisitos para a apresentação final. A nova direção e a avaliação de técnicas dentro do MonoGame estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md) e [ADR-0004](decisions/ADR-0004-visual-direction-and-renderer-evaluation.md).
 
 ## Direção
 
-A câmera permanece ortográfica e fixa, agora a cerca de 30° da vertical para enfatizar a leitura top-down sem esconder as faces. A altitude é dado físico da Geosfera; o cliente MonoGame amostra esse campo e o grava na coordenada vertical da malha. Textura e iluminação reforçam o relevo, mas não o substituem.
+Na implementação registrada nesta revisão, a câmera é ortográfica e o cliente MonoGame amostra a elevação física da Geosfera em uma malha. Esse estado é evidência do protótipo atual, não obrigação de câmera ou técnica. O requisito permanente é a apresentação consumir o relevo publicado sem substituí-lo por textura e sem decidir a geografia.
 
 As referências de Mapgen4 e do artigo Polygonal Map Generation orientam a separação entre feições geográficas, drenagem e biomas. Neste marco usamos curvas e campos de distância diretamente no sampler determinístico; não copiamos código, modelos ou imagens, nem incorporamos bibliotecas externas. Um grafo Voronoi/Delaunay pode ser avaliado quando o mapa deixar de ser uma grade pequena de simulação.
 
@@ -46,7 +50,7 @@ As referências de Mapgen4 e do artigo Polygonal Map Generation orientam a separ
 
 ## Limites desta etapa
 
-O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos por lado; não há LOD, streaming ou reconstrução seletiva. As cordilheiras têm encostas contínuas; três afloramentos possuem faces verticais explícitas. A drenagem usa o receptor D8 de maior declive e depressões locais, sem erosão que atualize o relevo, transporte de sedimentos ou chuva orográfica. O nível visual da água ainda aproxima a profundidade em vez de resolver uma superfície livre hidrostática. A flora usa faixas de altitude, inclinação e água determinísticas, não associações calibradas por espécie ou dados de campo. A malha já tem altitude geométrica, mas ainda faltam regiões geográficas mais diversas, erosão e uma rede de água contínua com quedas ligada aos níveis físicos.
+O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos por lado; não há LOD, streaming ou reconstrução seletiva. A v16 eleva as cristas e distribui sete afloramentos com faces verticais sobre as cordilheiras e o vale. A drenagem usa o receptor D8 de maior declive e depressões locais, sem erosão que atualize o relevo, transporte de sedimentos ou chuva orográfica. O nível visual da água ainda aproxima a profundidade em vez de resolver uma superfície livre hidrostática. A flora usa faixas de altitude, inclinação e água determinísticas, não associações calibradas por espécie ou dados de campo. A malha já tem altitude geométrica, mas ainda faltam regiões geográficas mais diversas, erosão e uma rede de água contínua com quedas ligada aos níveis físicos.
 
 ## Revisão geométrica v18 — relevo multiescala
 
@@ -68,3 +72,18 @@ O mundo de simulação ainda mede 64 × 64 células e usa quatro chunks fixos po
 - A câmera ortográfica passou de 24° para aproximadamente 30° da vertical (880 m horizontal, 1500 m de elevação), ampliando a leitura das faces físicas. O ribbon do rio interpola os receptores D8 por curvas Catmull–Rom, e cada vértice continua consultando a elevação do terreno; o campo hidrológico não muda.
 - A captura de revisão omite o HUD apenas no modo `--capture`; o jogo interativo continua com a interface normal. Veja `genesis-geometric-v26-camera-depth.png` no diretório de visualizações do Codex.
 - A cena destaca melhor o paredão e as encostas, mas ainda deixa canais largos e bosques em blocos de densidade visíveis. Em Release, 60 s: média 57.67 FPS, P95 30.52 ms, P99 49.53 ms, working set 198.2 MiB; cumpre as metas N4.
+
+## Geografia v16 — cristas mais altas e platôs nas encostas
+
+- As amplitudes das cristas principais sobem para 170–190 m a oeste e 132–150 m a leste; as seis cristas tributárias passam a 24–36 m. A Geosfera acrescenta quatro coroas de topo plano sobre os dois eixos montanhosos, com posições, perímetros, raios e alturas derivados da seed. Com as três feições existentes, cada seed gera sete faces rochosas ligadas ao mesmo campo de elevação que alimenta D8, água inicial, iluminação solar e flora.
+- O limite superior do campo passou a 340 m para comportar as coroas sem achatá-las. O terreno continua como malha triangulada de altura real; os chunks mantêm vértices, normais e UV coincidentes nas bordas. A câmera segue ortográfica e passa para aproximadamente 38° da vertical (1050 m horizontal, 1350 m de elevação).
+- A captura `genesis-geometric-v27-ridge-tablelands.png` registra a seed 1 sem HUD no diretório de visualizações do Codex. As montanhas e as faces laterais aparecem com mais clareza; a composição ainda tem canais largos e manchas de árvores perceptíveis em relação à referência.
+- O cliente reutiliza a composição projetada de sprites nos seis ticks de 10 minutos entre as atualizações ambientais horárias; seed, revisão horária, resolução e estação formam a chave do cache.
+- A validação Release passou com 22 testes. Seeds 1–3 avançaram até o tick 144 com altitude máxima entre 231,8 e 246,5 m e resíduos conservativos abaixo de `5.6×10⁻⁶` nas unidades reportadas pelo runner. O benchmark de 60 s será registrado em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
+
+## Hidrologia v17 — soleiras preservando o leito
+
+- O Priority-Flood condiciona depressões em um campo separado, sem escrever no relevo da Geosfera. A Hydrosphere agora mede soleira, capacidade e área submersa, e a água inicial nas bacias forma uma cota de lago nivelada abaixo do extravasamento.
+- Isso acrescenta bacias de armazenamento ao vale, mas ainda não faz o lago subir com chuva nem extravasar dinamicamente. Canais seguem D8 e o fluxo atual; a rede potencial ainda não usa vazão hidráulica para determinar largura visual.
+- A captura `genesis-hydrology-v17-level-pools.png` mostra os pools nivelados no relevo v16. A cena continua top-down ortográfica; o rio central ainda está largo/cruzado e as manchas de bosque ainda não têm a continuidade da referência.
+- Os 24 testes Release passaram; o benchmark de 60 s atende P95/P99 por margem estreita. Os máximos de reconstrução de geometria seguem altos e estão discriminados em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
