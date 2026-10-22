@@ -105,7 +105,8 @@ internal static class ProceduralFloraMeshBuilder
                 if (index != 0 || lastTrunkSegment < 0) continue;
                 var trunkTop = structure.Branches[lastTrunkSegment];
                 AddTube(vertices, tree.Ground + ToXna(branch.Start), tree.Ground + ToXna(trunkTop.End),
-                    branch.StartRadius, trunkTop.EndRadius, bark, tree.Seed, 5, tree.RenderProfileRow);
+                    branch.StartRadius, trunkTop.EndRadius, bark, tree.Seed, 5, tree.RenderProfileRow,
+                    profile.TrunkIrregularity);
                 continue;
             }
             var branchColor = branch.Order == 0 ? bark : Shade(bark, Math.Clamp(0.92f - branch.Order * 0.045f, 0.72f, 0.92f));
@@ -118,10 +119,11 @@ internal static class ProceduralFloraMeshBuilder
                 : 0f;
             AddBranchChain(vertices, tree.Ground, structure.Branches, sameOrderSuccessors, index,
                 branchColor, sides, tree.RenderProfileRow, hasBranchJunction, parentRadius,
-                branchJunctionChildren, detailLevel == 0 ? 2 : 1);
+                branchJunctionChildren, detailLevel == 0 ? 2 : 1,
+                tree.Seed, tree.Height, profile.TrunkIrregularity);
         }
 
-        // Small exposed roots anchor the trunk visually to uneven ground.
+        // Surface-root expression comes from the species root phenotype, never from a generic accessory roll.
         if (detailLevel > 0) AddRootFlare(vertices, tree, structure, bark);
         if (branchesOnly) return;
 
@@ -129,7 +131,7 @@ internal static class ProceduralFloraMeshBuilder
         var palette = HealthyFoliageColor(profile.RenderRow);
         if (distanceAwareLod && detailLevel == 0)
         {
-            AddDistantCanopy(vertices, tree, structure, palette);
+            AddDistantCanopy(vertices, tree, structure, palette, volumeCanopy);
             return;
         }
 
@@ -172,7 +174,8 @@ internal static class ProceduralFloraMeshBuilder
         List<VertexPositionColorTexture> vertices,
         ProceduralTreeInstance tree,
         ProceduralTreeStructure structure,
-        Color palette)
+        Color palette,
+        bool volumeCanopy)
     {
         // At map scale, replace individual leaf cards with a small, volumetric crown mesh.
         // The species profile supplies the crown bounds and architecture; the stable tree seed
@@ -196,23 +199,48 @@ internal static class ProceduralFloraMeshBuilder
         // sampling keeps a small, stable set that spans the branch scaffold at map scale.
         var sites = structure.Foliage;
         if (sites.Count == 0) return;
-        var clusterCount = Math.Min(sites.Count, Math.Clamp((int)MathF.Round(MathF.Sqrt(sites.Count) * 1.35f), 4, 10));
+        var clusterMultiplier = 1.35f;
+        var minimumClusters = 4;
+        var maximumClusters = 10;
+        if (volumeCanopy)
+        {
+            // Broad, branch-oriented card fans need more overlap at map scale so distant
+            // crowns keep a readable silhouette without changing their simulated biomass.
+            clusterMultiplier = 1.72f;
+            minimumClusters = 8;
+            maximumClusters = 16;
+        }
+        var clusterCount = Math.Min(sites.Count, Math.Clamp(
+            (int)MathF.Round(MathF.Sqrt(sites.Count) * clusterMultiplier), minimumClusters, maximumClusters));
         var selectedSites = SelectDistantFoliageSites(sites,
             tree.Height * (profile.CrownBase + profile.CrownTop) * 0.5f,
             crownHeight, crownWidth, clusterCount);
+
+        if (volumeCanopy)
+        {
+            // A high landscape camera sees vertical leaf cards edge-on. At this LOD,
+            // replace their sparse alpha-cut silhouettes with a compact, opaque crown
+            // volume built from the same terminal-shoot attachments. Close LODs still
+            // use individual textured leaves and branch detail.
+            AddDistantBroadleafMasses(vertices, tree, sites, selectedSites, palette, profile);
+            return;
+        }
+
         for (var index = 0; index < selectedSites.Length; index++)
         {
             var site = sites[selectedSites[index]];
             var center = tree.Ground + ToXna(site.Position);
             var direction = NormalizeOr(ToXna(site.Direction), Vector3.Up);
             var outward = NormalizeOr(ToXna(site.Outward), Vector3.Right);
-            var scale = site.Scale * (1.22f + Unit(tree.Seed, 0x44495354434C5553UL, (ulong)index) * 0.24f);
+            var scale = site.Scale * (volumeCanopy
+                ? 1.50f + Unit(tree.Seed, 0x44495354434C5553UL, (ulong)index) * 0.30f
+                : 1.22f + Unit(tree.Seed, 0x44495354434C5553UL, (ulong)index) * 0.24f);
             // Keep coarse crowns made of branch-oriented card fans and leaf blades rather
             // than substituting the terminal shoots with spheres. This is a bounded foliage
             // budget sampled from the same attachment sites used by the close LOD.
             AddFoliageCluster(vertices, center, direction, outward, scale, palette,
                 tree.Seed ^ (ulong)(index + 31), false, profile.Architecture,
-                1, false, profile.RenderRow, tree.Height,
+                1, volumeCanopy, profile.RenderRow, tree.Height,
                 LeafSizeFactor(profile, site.Position.Y, tree.Height));
         }
     }
@@ -273,6 +301,93 @@ internal static class ProceduralFloraMeshBuilder
         return selected;
     }
 
+    private static void AddDistantBroadleafMasses(
+        List<VertexPositionColorTexture> vertices,
+        ProceduralTreeInstance tree,
+        IReadOnlyList<TreeFoliageSite> sites,
+        IReadOnlyList<int> selectedSites,
+        Color palette,
+        TreeRenderProfile profile)
+    {
+        var canopyTexel = AtlasUv(profile.RenderRow, 3, 0.5f, 0.5f);
+        for (var index = 0; index < selectedSites.Count; index++)
+        {
+            var site = sites[selectedSites[index]];
+            var direction = NormalizeOr(ToXna(site.Direction), Vector3.Up);
+            var scale = site.Scale * CanopySpread * 1.18f
+                * (0.88f + Unit(tree.Seed, 0x444953544D415353UL, (ulong)index) * 0.24f);
+            // Let distant 3D masses overlap enough to read as one crown while retaining
+            // the profile's envelope. This changes coverage, not lobe tessellation or
+            // the simulated foliage quantity.
+            var (horizontalScale, verticalScale) = profile.Architecture == TreeArchitecture.WeepingBroadleaf
+                ? (0.72f, 0.39f)
+                : profile.CrownShape switch
+                {
+                    TreeCrownShape.Hemispherical => (0.74f, 0.39f),
+                    TreeCrownShape.Spherical => (0.62f, 0.46f),
+                    TreeCrownShape.TaperedCylindrical => (0.44f, 0.64f),
+                    _ => (0.60f, 0.43f)
+                };
+            var center = tree.Ground + ToXna(site.Position) + direction * (scale * 0.055f);
+            var radii = new Vector3(
+                scale * horizontalScale * (0.88f + Unit(tree.Seed, 0x444953544D415358UL, (ulong)index) * 0.24f),
+                scale * verticalScale * (0.88f + Unit(tree.Seed, 0x444953544D415359UL, (ulong)index) * 0.24f),
+                scale * horizontalScale * (0.88f + Unit(tree.Seed, 0x444953544D41535AUL, (ulong)index) * 0.24f));
+            var lobeColor = Shade(palette,
+                0.90f + Unit(tree.Seed, 0x444953544D415343UL, (ulong)index) * 0.16f);
+            AddDistantBroadleafLobe(vertices, center, radii, lobeColor, tree.Seed,
+                (ulong)index, canopyTexel);
+        }
+    }
+
+    private static void AddDistantBroadleafLobe(
+        List<VertexPositionColorTexture> vertices,
+        Vector3 center,
+        Vector3 radii,
+        Color color,
+        ulong seed,
+        ulong lobe,
+        Vector2 canopyTexel)
+    {
+        var rotation = Matrix.CreateFromYawPitchRoll(
+            Unit(seed, 0x444953544D415357UL, lobe) * Tau,
+            (Unit(seed, 0x444953544D415350UL, lobe) - 0.5f) * 0.42f,
+            (Unit(seed, 0x444953544D415352UL, lobe) - 0.5f) * 0.42f);
+        var transformed = new Vector3[SmoothCanopy.Vertices.Length];
+        var vertexColors = new Color[SmoothCanopy.Vertices.Length];
+        for (var index = 0; index < SmoothCanopy.Vertices.Length; index++)
+        {
+            var canonical = SmoothCanopy.Vertices[index];
+            var unit = Vector3.Transform(canonical, rotation);
+            var irregularity = 0.90f
+                + Unit(seed, 0x444953544D415349UL, lobe * 31 + (ulong)index) * 0.24f;
+            transformed[index] = center + new Vector3(
+                unit.X * radii.X,
+                unit.Y * radii.Y,
+                unit.Z * radii.Z) * irregularity;
+            var normal = Vector3.Normalize(new Vector3(
+                unit.X / radii.X,
+                unit.Y / radii.Y,
+                unit.Z / radii.Z));
+            var sunlight = Math.Max(0f, Vector3.Dot(normal, LightDirection));
+            vertexColors[index] = Shade(color, 0.81f + sunlight * 0.22f);
+        }
+
+        for (var face = 0; face < SmoothCanopy.Faces.Length; face += 3)
+        {
+            var firstIndex = SmoothCanopy.Faces[face];
+            var secondIndex = SmoothCanopy.Faces[face + 1];
+            var thirdIndex = SmoothCanopy.Faces[face + 2];
+            // The dedicated opaque crown material keeps this volume solid; a subdivided
+            // irregular surface and interpolated vertex lighting reduce the coarse-facet
+            // look of distant crowns without relying on a camera-facing or bitmap shape.
+            AddTexturedTriangle(vertices,
+                transformed[firstIndex], transformed[secondIndex], transformed[thirdIndex],
+                vertexColors[firstIndex], vertexColors[secondIndex], vertexColors[thirdIndex],
+                canopyTexel, canopyTexel, canopyTexel);
+        }
+    }
+
     private static void AddDistantConiferCrown(
         List<VertexPositionColorTexture> vertices,
         Vector3 center,
@@ -303,7 +418,7 @@ internal static class ProceduralFloraMeshBuilder
             }
         }
 
-        var canopyTexel = AtlasUv(speciesRow, 1, 0.5f, 0.5f);
+        var canopyTexel = AtlasUv(speciesRow, 3, 0.5f, 0.5f);
         for (var ring = 0; ring < rings - 1; ring++)
         for (var side = 0; side < sides; side++)
         {
@@ -312,14 +427,14 @@ internal static class ProceduralFloraMeshBuilder
             var lowerRight = ringPoints[ring, next];
             var upperLeft = ringPoints[ring + 1, side];
             var upperRight = ringPoints[ring + 1, next];
-            AddLitConiferTriangle(vertices, lowerLeft, upperLeft, lowerRight,
+            AddLitCrownTriangle(vertices, lowerLeft, upperLeft, lowerRight,
                 center, palette, canopyTexel);
-            AddLitConiferTriangle(vertices, lowerRight, upperLeft, upperRight,
+            AddLitCrownTriangle(vertices, lowerRight, upperLeft, upperRight,
                 center, palette, canopyTexel);
         }
     }
 
-    private static void AddLitConiferTriangle(
+    private static void AddLitCrownTriangle(
         List<VertexPositionColorTexture> vertices,
         Vector3 first,
         Vector3 second,
@@ -344,18 +459,40 @@ internal static class ProceduralFloraMeshBuilder
         Color bark)
     {
         var rootRadius = structure.Branches[0].StartRadius;
-        var rootCount = structure.Profile.Architecture == TreeArchitecture.UprightBroadleaf ? 3 : 5;
+        var traits = structure.RootTraits;
+        if (traits.SurfaceRootExpressionPotential <= 0f) return;
+        var expression = traits.SurfaceRootExpressionPotential
+            * (0.90f + Unit(tree.Seed, 0x524F4F5456495349UL, 1) * 0.20f);
+        var rootCount = Math.Clamp(traits.SurfaceRootCount
+            + (int)MathF.Round((Unit(tree.Seed, 0x524F4F54434F554EUL, 0) - 0.5f) * 2f), 3, 9);
         var phase = Unit(tree.Seed, 0x524F4F54464C4152UL, 0) * Tau;
         for (var root = 0; root < rootCount; root++)
         {
-            var angle = phase + Tau * root / rootCount;
+            var spacing = Tau / rootCount;
+            var angle = phase + spacing * root
+                + (Unit(tree.Seed, 0x524F4F54414E474CUL, (ulong)root) - 0.5f)
+                    * spacing * traits.AzimuthJitter;
             var radial = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
-            var reach = rootRadius * (2.4f + Unit(tree.Seed, 0x524F4F544C454E47UL, (ulong)root) * 1.1f);
-            var start = tree.Ground + Vector3.Up * rootRadius * 0.72f;
-            var end = tree.Ground + radial * reach + Vector3.Up * rootRadius * 0.08f;
-            AddTube(vertices, start, end, rootRadius * 0.38f, rootRadius * 0.045f,
-                Shade(bark, 0.84f + Unit(tree.Seed, 0x524F4F54434F4C52UL, (ulong)root) * 0.18f),
-                tree.Seed ^ (ulong)root, 4, tree.RenderProfileRow);
+            var tangent = new Vector3(-radial.Z, 0, radial.X);
+            var reach = rootRadius * traits.LateralSpreadRatio
+                * expression
+                * (0.80f + Unit(tree.Seed, 0x524F4F544C454E47UL, (ulong)root) * 0.42f);
+            var sidewaysDrift = (Unit(tree.Seed, 0x524F4F5453454354UL, (ulong)root) - 0.5f) * reach * 0.28f;
+            var start = tree.Ground + radial * rootRadius * 0.18f
+                + Vector3.Up * rootRadius * (0.62f + Unit(tree.Seed, 0x524F4F5453544152UL, (ulong)root) * 0.18f);
+            var middle = tree.Ground + radial * reach * 0.48f + tangent * sidewaysDrift
+                + Vector3.Up * rootRadius * 0.25f;
+            var end = tree.Ground + radial * reach + tangent * (sidewaysDrift * 1.55f)
+                + Vector3.Up * rootRadius * (0.025f + Unit(tree.Seed, 0x524F4F54454E4459UL, (ulong)root) * 0.10f);
+            var rootScale = traits.SurfaceRootThicknessRatio * expression
+                * (0.82f + Unit(tree.Seed, 0x524F4F5454484943UL, (ulong)root) * 0.36f);
+            var rootColor = Shade(bark, 0.84f + Unit(tree.Seed, 0x524F4F54434F4C52UL, (ulong)root) * 0.18f);
+            AddTube(vertices, start, middle, rootRadius * rootScale, rootRadius * rootScale * 0.57f,
+                rootColor, tree.Seed ^ (ulong)(root * 2), 5, tree.RenderProfileRow,
+                structure.Profile.TrunkIrregularity * 0.24f);
+            AddTube(vertices, middle, end, rootRadius * rootScale * 0.57f, rootRadius * 0.035f,
+                rootColor, tree.Seed ^ (ulong)(root * 2 + 1), 5, tree.RenderProfileRow,
+                structure.Profile.TrunkIrregularity * 0.18f);
         }
     }
 
@@ -386,20 +523,21 @@ internal static class ProceduralFloraMeshBuilder
 
         if (detailLevel == 0)
         {
-            AddCanopyCard(vertices, center + stemDirection * spread * 0.06f, stemDirection,
-                outward, spread, baseColor, seed, architecture, speciesRow);
+            AddProceduralFoliageVolume(vertices,
+                center + stemDirection * spread * 0.06f, spread, 1f, baseColor,
+                seed, architecture, speciesRow);
             return;
         }
 
         if (needles)
         {
-            // Individual pine needles are thinner than a screen pixel at ordinary zoom. A
-            // small cross-card of procedurally drawn needle sprays preserves the branch
-            // silhouette there; real needle blades remain layered on top at close range.
+            // Individual pine needles are thinner than a screen pixel at ordinary zoom.
+            // An irregular 3D foliage mass preserves the branch silhouette; individual
+            // needle blades are layered over it at close range.
             var needleMassScale = detailLevel == 1 ? 0.24f : volumeCanopy ? 0.30f : 0.28f;
-            AddCanopyCard(vertices, center + stemDirection * spread * 0.025f,
-                stemDirection, outward, spread * needleMassScale, baseColor, seed,
-                architecture, speciesRow, detailLevel == 1 ? 3 : volumeCanopy ? 5 : 4);
+            AddProceduralFoliageVolume(vertices,
+                center + stemDirection * spread * 0.025f, spread, needleMassScale, baseColor,
+                seed, architecture, speciesRow);
 
             // Radial needle sprays add fine detail without a dense cloud of individual
             // triangles. At map scale the full branch structure collapses to the crown LOD.
@@ -426,20 +564,14 @@ internal static class ProceduralFloraMeshBuilder
 
         // Each terminal shoot carries a small fan of pointed, folded leaf blades. The
         // overlapping fans make a broken canopy edge and keep visible gaps for branch depth.
-        var coreColor = baseColor;
-        // Use overlapping, alpha-cut leaf-mass cards behind the individual blades.
-        // A smooth sphere at every terminal shoot reads as a string of low-poly balls
-        // at close range, while crossed textured cards keep a broken leafy silhouette
-        // and cost fewer vertices than subdivided canopy lobes.
+        // Use a small irregular 3D lobe behind individual blades. Keeping this volume
+        // aligned to the branch scaffold avoids substituting cross-card foliage for a tree.
         var massScale = detailLevel == 1 ? 0.32f : volumeCanopy ? 0.30f : 0.26f;
-        var massPlanes = detailLevel == 1 ? 3 : volumeCanopy ? 5 : 4;
-        AddCanopyCard(vertices, center + stemDirection * spread * 0.025f,
-            stemDirection, outward, spread * massScale, coreColor, seed,
-            architecture, speciesRow, massPlanes);
+        AddProceduralFoliageVolume(vertices,
+            center + stemDirection * spread * 0.025f, spread, massScale, baseColor,
+            seed, architecture, speciesRow);
 
-        var leafCount = volumeCanopy
-            ? detailLevel == 1 ? 9 : 32
-            : detailLevel == 1 ? 9 : 24;
+        var leafCount = detailLevel == 1 ? 9 : 24;
         var leafLengthFraction = speciesRow switch
         {
             0 => 0.0036f, // broad, lobed leaves
@@ -475,56 +607,34 @@ internal static class ProceduralFloraMeshBuilder
         }
     }
 
-    private static void AddCanopyCard(
+    private static void AddProceduralFoliageVolume(
         List<VertexPositionColorTexture> vertices,
         Vector3 center,
-        Vector3 stemDirection,
-        Vector3 outward,
         float spread,
+        float massScale,
         Color baseColor,
         ulong seed,
         TreeArchitecture architecture,
-        int speciesRow,
-        int planeCount = 2)
+        int speciesRow)
     {
-        var halfWidth = spread * (architecture switch
+        var (horizontalShape, verticalShape) = architecture switch
         {
-            TreeArchitecture.ConicalConifer => 0.92f,
-            TreeArchitecture.UprightBroadleaf => 1.12f,
-            TreeArchitecture.WeepingBroadleaf => 0.90f,
-            _ => 1.34f
-        });
-        var halfHeight = spread * (architecture switch
-        {
-            TreeArchitecture.ConicalConifer => 1.10f,
-            TreeArchitecture.UprightBroadleaf => 1.22f,
-            TreeArchitecture.WeepingBroadleaf => 1.02f,
-            _ => 0.94f
-        });
-        var vertical = Vector3.Up;
-        var facing = NormalizeOr(outward + stemDirection * 0.18f, Vector3.Forward);
-        for (var plane = 0; plane < planeCount; plane++)
-        {
-            var angle = Unit(seed, 0x43415244414E474CUL, (ulong)plane) * Tau + plane * Tau / planeCount;
-            var horizontal = new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle));
-            if (Vector3.Dot(horizontal, facing) < 0f) horizontal = -horizontal;
-            var bottom = center - vertical * (halfHeight * 0.56f);
-            var top = center + vertical * (halfHeight * 0.58f);
-            var lowerLeft = bottom - horizontal * halfWidth;
-            var lowerRight = bottom + horizontal * halfWidth;
-            var upperLeft = top - horizontal * (halfWidth * 0.78f);
-            var upperRight = top + horizontal * (halfWidth * 0.78f);
-            var cardNormal = Vector3.Normalize(Vector3.Cross(horizontal, vertical));
-            var color = Shade(baseColor, 0.84f + Math.Max(0, Vector3.Dot(cardNormal, LightDirection)) * 0.24f);
-            var lowerLeftUv = AtlasUv(speciesRow, 1, 0f, 1f);
-            var lowerRightUv = AtlasUv(speciesRow, 1, 1f, 1f);
-            var upperLeftUv = AtlasUv(speciesRow, 1, 0.11f, 0f);
-            var upperRightUv = AtlasUv(speciesRow, 1, 0.89f, 0f);
-            AddTexturedTriangle(vertices, lowerLeft, upperLeft, lowerRight, color,
-                lowerLeftUv, upperLeftUv, lowerRightUv);
-            AddTexturedTriangle(vertices, lowerRight, upperLeft, upperRight, color,
-                lowerRightUv, upperLeftUv, upperRightUv);
-        }
+            TreeArchitecture.ConicalConifer => (0.88f, 1.08f),
+            TreeArchitecture.UprightBroadleaf => (0.88f, 1.18f),
+            TreeArchitecture.WeepingBroadleaf => (0.78f, 0.92f),
+            _ => (1.05f, 0.92f)
+        };
+        var horizontalVariation = 0.90f + Unit(seed, 0x464F4C4941474558UL, 0) * 0.20f;
+        var depthVariation = 0.90f + Unit(seed, 0x464F4C4941474559UL, 0) * 0.20f;
+        var verticalVariation = 0.90f + Unit(seed, 0x464F4C494147455AUL, 0) * 0.20f;
+        var radii = new Vector3(
+            spread * massScale * horizontalShape * horizontalVariation,
+            spread * massScale * verticalShape * verticalVariation,
+            spread * massScale * horizontalShape * depthVariation);
+        // Keep each branch-local mass volumetric but low-poly. Individual leaf blades
+        // supply close detail without multiplying the foliage scaffold by four.
+        AddCanopyLobe(vertices, center, radii, baseColor, seed, lobe: 0,
+            detailLevel: 0, speciesRow: speciesRow);
     }
 
     private static void AddLeafBlade(
@@ -714,7 +824,10 @@ internal static class ProceduralFloraMeshBuilder
         bool hasBranchJunction,
         float parentRadius,
         IReadOnlyList<int>?[] branchJunctionChildren,
-        int centerlineStride)
+        int centerlineStride,
+        ulong treeSeed,
+        float treeHeight,
+        float trunkIrregularity)
     {
         var points = new List<Vector3>(8);
         var radii = new List<float>(8);
@@ -795,6 +908,19 @@ internal static class ProceduralFloraMeshBuilder
         }
 
         var angleStep = Tau / sides;
+        var trunkPhase = Unit(treeSeed, 0x5452554E4B534543UL, (ulong)firstBranchIndex) * Tau;
+        var trunkPhase2 = Unit(treeSeed, 0x5452554E4B534543UL, (ulong)firstBranchIndex + 1) * Tau;
+        var trunkPhase3 = Unit(treeSeed, 0x5452554E4B534543UL, (ulong)firstBranchIndex + 2) * Tau;
+        float TrunkSectionScale(int pointIndex, float angle)
+        {
+            if (first.Order != 0 || trunkIrregularity <= 0f) return 1f;
+            var progress = Math.Clamp((points[pointIndex].Y - ground.Y) / Math.Max(1f, treeHeight), 0f, 1f);
+            var flute = 0.55f * MathF.Sin(3f * angle + trunkPhase)
+                + 0.30f * MathF.Sin(2f * angle + trunkPhase2)
+                + 0.15f * MathF.Sin(angle + trunkPhase3);
+            return 1f + trunkIrregularity * flute * (0.40f + 0.60f * (1f - progress));
+        }
+
         for (var pointIndex = 0; pointIndex < points.Count - 1; pointIndex++)
         {
             var startRadius = radii[pointIndex];
@@ -811,10 +937,10 @@ internal static class ProceduralFloraMeshBuilder
                 var radial01 = normals[pointIndex] * MathF.Cos(angle1) + binormals[pointIndex] * MathF.Sin(angle1);
                 var radial10 = normals[pointIndex + 1] * MathF.Cos(angle0) + binormals[pointIndex + 1] * MathF.Sin(angle0);
                 var radial11 = normals[pointIndex + 1] * MathF.Cos(angle1) + binormals[pointIndex + 1] * MathF.Sin(angle1);
-                var p0 = points[pointIndex] + radial00 * startRadius;
-                var p1 = points[pointIndex] + radial01 * startRadius;
-                var p2 = points[pointIndex + 1] + radial11 * endRadius;
-                var p3 = points[pointIndex + 1] + radial10 * endRadius;
+                var p0 = points[pointIndex] + radial00 * (startRadius * TrunkSectionScale(pointIndex, angle0));
+                var p1 = points[pointIndex] + radial01 * (startRadius * TrunkSectionScale(pointIndex, angle1));
+                var p2 = points[pointIndex + 1] + radial11 * (endRadius * TrunkSectionScale(pointIndex + 1, angle1));
+                var p3 = points[pointIndex + 1] + radial10 * (endRadius * TrunkSectionScale(pointIndex + 1, angle0));
                 var u0 = side / (float)sides;
                 var u1 = (side + 1) / (float)sides;
                 var c0 = Shade(color, 0.76f + 0.42f * Math.Max(0, Vector3.Dot(radial00, LightDirection)));
@@ -886,7 +1012,8 @@ internal static class ProceduralFloraMeshBuilder
         Color color,
         ulong seed,
         int sides,
-        int speciesRow)
+        int speciesRow,
+        float radialIrregularity = 0f)
     {
         var axis = end - start;
         var length = axis.Length();
@@ -903,10 +1030,15 @@ internal static class ProceduralFloraMeshBuilder
             var a1 = (side + 1) * step;
             var radial0 = first * MathF.Cos(a0) + second * MathF.Sin(a0);
             var radial1 = first * MathF.Cos(a1) + second * MathF.Sin(a1);
-            var p0 = start + radial0 * startRadius;
-            var p1 = start + radial1 * startRadius;
-            var p2 = end + radial1 * endRadius;
-            var p3 = end + radial0 * endRadius;
+            float SectionScale(float angle, ulong index)
+                => 1f + radialIrregularity * ((Unit(seed, 0x5455424552414449UL, index) - 0.5f) * 0.42f
+                    + MathF.Sin(angle * 3f + Unit(seed, 0x5455424550484153UL, 0) * Tau) * 0.58f);
+            var scale0 = SectionScale(a0, (ulong)side);
+            var scale1 = SectionScale(a1, (ulong)((side + 1) % sides));
+            var p0 = start + radial0 * (startRadius * scale0);
+            var p1 = start + radial1 * (startRadius * scale1);
+            var p2 = end + radial1 * (endRadius * scale1);
+            var p3 = end + radial0 * (endRadius * scale0);
             var face = Shade(color, 0.76f + 0.42f * Math.Max(0, Vector3.Dot(radial0, LightDirection)));
             var u0 = side / (float)sides;
             var u1 = (side + 1) / (float)sides;
@@ -934,7 +1066,7 @@ internal static class ProceduralFloraMeshBuilder
         const float gutter = 2f;
         const float step = cell + gutter * 2f;
         const float width = 5 * step;
-        const float height = 3 * step;
+        const float height = 4 * step;
         return new Vector2(
             (Math.Clamp(speciesRow, 0, 4) * step + gutter + Math.Clamp(localU, 0, 1) * cell) / width,
             (Math.Clamp(materialRow, 0, 2) * step + gutter + Math.Clamp(localV, 0, 1) * cell) / height);

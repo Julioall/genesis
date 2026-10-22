@@ -6,12 +6,15 @@ using Game.Contracts;
 using Game.Core;
 using Game.Procedural;
 using Game.Client.Desktop;
+using Game.Modules.Atmosphere;
+using Game.Modules.Cosmos;
 using Game.Modules.Geosphere;
 using Game.Modules.Hydrosphere;
 using Game.Modules.Biosphere;
 
 var capturePath = GetCapturePath(args);
 var snapshotPath = GetSnapshotPath(args);
+var savePath = GetSavePath(args);
 var benchmarkSeconds = GetBenchmarkDurationSeconds(args);
 var defaultPresentationWidth = capturePath is null && benchmarkSeconds is null ? 1600 : 1280;
 var defaultPresentationHeight = capturePath is null && benchmarkSeconds is null ? 900 : 720;
@@ -36,17 +39,25 @@ var treeBillboards = hybridTreeLod || crossedTreeBillboards || args.Contains("--
 var volumeCanopy = args.Contains("--volume-canopy", StringComparer.Ordinal);
 var exaggeratedReliefView = args.Contains("--exaggerated-relief-view", StringComparer.Ordinal);
 var distanceAwareTreeLod = args.Contains("--distance-aware-tree-lod", StringComparer.Ordinal);
+var zoologyGalleryFishView = args.Contains("--zoology-gallery-fish", StringComparer.Ordinal);
+var zoologyGallery = args.Contains("--zoology-gallery", StringComparer.Ordinal) || zoologyGalleryFishView;
+var creatureGeometryView = args.Contains("--creature-geometry-view", StringComparer.Ordinal);
 var synchronizeWithVsync = !args.Contains("--disable-vsync", StringComparer.Ordinal);
 var displayReliefScale = GetDisplayReliefScale(args, exaggeratedReliefView);
-var initialCameraZoom = GetInitialCameraZoom(args, visualEvaluation && referenceLandscapeView, treeQualityView);
+var initialCameraZoom = GetInitialCameraZoom(args, visualEvaluation && referenceLandscapeView,
+    treeQualityView, creatureGeometryView);
 var initialCameraFocus = GetInitialCameraFocus(args);
+var initialCameraAzimuthDegrees = GetInitialCameraAzimuth(args);
+var initialCameraElevationDegrees = GetInitialCameraElevation(args);
+var visualInstanceMultiplier = GetVisualInstanceMultiplier(args);
 var seed = GetSeed(args);
-using var game = new NaturalWorldGame(capturePath, snapshotPath, benchmarkSeconds,
-    presentationWidth, presentationHeight, visualEvaluation, perspectiveProjection,
+using var game = new NaturalWorldGame(capturePath, snapshotPath, savePath, benchmarkSeconds,
+    presentationWidth, presentationHeight, visualEvaluation, visualInstanceMultiplier, perspectiveProjection,
     showWaterFixtures, wideEvaluationView, panoramaEvaluationView, referenceCompositionView, referenceLandscapeView,
     lowerReferenceAngle, higherReferenceAngle, bakedTerrainHillshade, hybridTreeLod, treeBillboards, crossedTreeBillboards,
     volumeCanopy, distanceAwareTreeLod, treeQualityView, treeBranchesOnly,
-    displayReliefScale, initialCameraZoom, initialCameraFocus, seed, synchronizeWithVsync);
+    zoologyGallery, zoologyGalleryFishView, creatureGeometryView, displayReliefScale, initialCameraZoom, initialCameraFocus,
+    initialCameraAzimuthDegrees, initialCameraElevationDegrees, seed, synchronizeWithVsync);
 game.Run();
 
 static string? GetCapturePath(string[] arguments)
@@ -61,6 +72,15 @@ static string? GetSnapshotPath(string[] arguments)
     for (var index = 0; index < arguments.Length - 1; index++)
         if (arguments[index] == "--snapshot-file") return Path.GetFullPath(arguments[index + 1]);
     return null;
+}
+
+static string GetSavePath(string[] arguments)
+{
+    for (var index = 0; index < arguments.Length - 1; index++)
+        if (arguments[index] == "--save-file")
+            return Path.GetFullPath(arguments[index + 1]);
+    return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Game", "natural-world-save.json");
 }
 
 static int? GetBenchmarkDurationSeconds(string[] arguments)
@@ -79,6 +99,14 @@ static int GetPresentationDimension(string[] arguments, string option, int defau
     return defaultValue;
 }
 
+static int GetVisualInstanceMultiplier(string[] arguments)
+{
+    for (var index = 0; index < arguments.Length - 1; index++)
+        if (arguments[index] == "--visual-instance-multiplier")
+            return Math.Clamp(int.Parse(arguments[index + 1], System.Globalization.CultureInfo.InvariantCulture), 1, 10);
+    return 1;
+}
+
 static ulong GetSeed(string[] arguments)
 {
     for (var index = 0; index < arguments.Length - 1; index++)
@@ -94,13 +122,14 @@ static double GetDisplayReliefScale(string[] arguments, bool exaggeratedReliefVi
     return exaggeratedReliefView ? 1.40 : 1.0;
 }
 
-static float GetInitialCameraZoom(string[] arguments, bool referenceLandscapeView, bool treeQualityView)
+static float GetInitialCameraZoom(string[] arguments, bool referenceLandscapeView, bool treeQualityView,
+    bool creatureGeometryView)
 {
     for (var index = 0; index < arguments.Length - 1; index++)
         if (arguments[index] == "--camera-zoom")
             return Math.Clamp(float.Parse(arguments[index + 1], System.Globalization.CultureInfo.InvariantCulture), 0.45f,
                 NaturalWorldGame.MaximumCameraZoom);
-    return treeQualityView ? 44f : referenceLandscapeView ? 1.25f : 1f;
+    return creatureGeometryView ? 32f : treeQualityView ? 44f : referenceLandscapeView ? 1.25f : 1f;
 }
 
 static Vector2? GetInitialCameraFocus(string[] arguments)
@@ -110,6 +139,31 @@ static Vector2? GetInitialCameraFocus(string[] arguments)
             return new Vector2(
                 float.Parse(arguments[index + 1], System.Globalization.CultureInfo.InvariantCulture),
                 float.Parse(arguments[index + 2], System.Globalization.CultureInfo.InvariantCulture));
+    return null;
+}
+
+static float? GetInitialCameraAzimuth(string[] arguments)
+{
+    for (var index = 0; index < arguments.Length - 1; index++)
+    {
+        if (arguments[index] != "--camera-azimuth") continue;
+        var angle = float.Parse(arguments[index + 1], System.Globalization.CultureInfo.InvariantCulture);
+        if (!float.IsFinite(angle)) throw new ArgumentOutOfRangeException("--camera-azimuth");
+        var normalized = angle % 360f;
+        return normalized < 0 ? normalized + 360f : normalized;
+    }
+    return null;
+}
+
+static float? GetInitialCameraElevation(string[] arguments)
+{
+    for (var index = 0; index < arguments.Length - 1; index++)
+        if (arguments[index] == "--camera-elevation")
+        {
+            var angle = float.Parse(arguments[index + 1], System.Globalization.CultureInfo.InvariantCulture);
+            if (!float.IsFinite(angle)) throw new ArgumentOutOfRangeException("--camera-elevation");
+            return Math.Clamp(angle, 5f, 85f);
+        }
     return null;
 }
 
@@ -170,6 +224,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private readonly bool _distanceAwareTreeLod;
     private readonly bool _treeQualityView;
     private readonly bool _treeBranchesOnly;
+    private readonly bool _zoologyGallery;
+    private readonly bool _zoologyGalleryFishView;
+    private readonly bool _creatureGeometryView;
+    private readonly bool _hasExplicitInitialCameraFocus;
+    private readonly int _visualInstanceMultiplier;
     private readonly double _displayReliefScale;
     private bool _showWaterFixtures;
     private readonly List<double> _benchmarkFrameTimesMs = [];
@@ -214,17 +273,32 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private int _evaluationShadowPrimitiveCount;
     private VertexBuffer? _evaluationRockVertexBuffer;
     private int _evaluationRockPrimitiveCount;
+    private VertexBuffer? _quadrupedGalleryVertexBuffer;
+    private int _quadrupedGalleryPrimitiveCount;
+    private VertexBuffer? _fishGalleryVertexBuffer;
+    private int _fishGalleryPrimitiveCount;
+    private readonly CreatureDevelopmentModelV1 _creatureDevelopment = new();
+    private readonly CreatureGeometryBuilderV1 _creatureGeometryBuilder = new();
+    private readonly Dictionary<(ulong GenomeId, int DevelopmentStep), CreatureRenderMesh> _creatureGeometryCache = [];
+    private int _creatureGeometryDrawnCount;
     private AlphaTestEffect? _treeBillboardEffect;
     private Texture2D[] _treeBillboardTextures = [];
     private readonly List<TreeBillboardRenderBatch> _treeBillboardBatches = [];
+    private sealed record CreatureRenderMesh(
+        VertexBuffer Vertices,
+        int PrimitiveCount,
+        double MinimumY,
+        double ReferenceAdultBodyLengthM);
     private Matrix _view = Matrix.Identity;
     private Matrix _projection = Matrix.Identity;
     private Vector3 _cameraPosition;
     private Vector3 _cameraTarget;
     private Vector2 _cameraPanM;
     private Vector2 _treeGalleryCenterM;
-    private readonly Vector2 _initialCameraPanM;
+    private Vector2 _initialCameraPanM;
     private readonly float _initialCameraZoom;
+    private readonly float? _initialCameraAzimuthDegrees;
+    private readonly float? _initialCameraElevationDegrees;
     private float _cameraZoom = 1f;
     private MouseState _previousMouse;
     private bool _hasPreviousMouse;
@@ -237,6 +311,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private List<Vector2>? _evaluationWatercoursePath;
     private SurfaceDrainageField _surfaceDrainage;
     private int[] _waterDepressionId = [];
+    private DepressionBasin[] _waterBasins = [];
     private double _centerElevationM;
     private double _seaLevelM;
     private long _terrainRevision = -1;
@@ -247,6 +322,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private int _groundSpritesViewportHeight = -1;
     private Season _groundSpritesSeason = Season.Summer;
     private int _terrainOverlay = -1;
+    private readonly CosmosModuleV1 _cosmos = new();
+    private readonly AtmosphereModuleV1 _atmosphere = new();
+    private readonly GeosphereModuleV1 _geosphere = new();
+    private readonly HydrosphereModuleV1 _hydrosphere = new();
+    private readonly BiosphereModuleV1 _biosphere = new();
     private WorldSimulation _world = null!;
     private WorldSnapshot _snapshot = null!;
     private KeyboardState _previous;
@@ -267,6 +347,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private double _benchmarkTextureBuildTotalMs;
     private double _benchmarkTextureBuildMaxMs;
     private int _benchmarkTextureBuildCount;
+    private long _benchmarkMaxDrawCount;
+    private long _benchmarkMaxPrimitiveCount;
+    private double _visualSceneBuildMs;
     private int _floraTreeCount;
     private int _floraVertexCount;
     private int _groundCoverClusterCount;
@@ -274,6 +357,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private int _evaluationShadowVertexCount;
     private int _treeBillboardCount;
     private int _treeBillboardVertexCount;
+    private int _faunaSpriteCount;
+    private string _faunaLayoutHash = "";
     private bool _paused;
     private readonly bool _synchronizeWithVsync;
     private bool _perspectiveProjection;
@@ -281,20 +366,23 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private int _overlayMode;
     private int _speedIndex = 2;
     private static readonly int[] Speeds = [1, 2, 6, 12, 24];
-    private readonly string _savePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Game", "natural-world-save.json");
+    private readonly string _savePath;
 
-    public NaturalWorldGame(string? capturePath, string? snapshotPath, int? benchmarkDurationSeconds,
-        int presentationWidth, int presentationHeight, bool visualEvaluation,
+    public NaturalWorldGame(string? capturePath, string? snapshotPath, string savePath, int? benchmarkDurationSeconds,
+        int presentationWidth, int presentationHeight, bool visualEvaluation, int visualInstanceMultiplier,
         bool perspectiveProjection, bool showWaterFixtures, bool wideEvaluationView,
         bool panoramaEvaluationView, bool referenceCompositionView, bool referenceLandscapeView,
         bool lowerReferenceAngle, bool higherReferenceAngle, bool bakedTerrainHillshade, bool hybridTreeLod, bool treeBillboards,
         bool crossedTreeBillboards, bool volumeCanopy,
-        bool distanceAwareTreeLod, bool treeQualityView, bool treeBranchesOnly, double displayReliefScale, float initialCameraZoom,
-        Vector2? initialCameraFocus, ulong seed, bool synchronizeWithVsync)
+        bool distanceAwareTreeLod, bool treeQualityView, bool treeBranchesOnly, bool zoologyGallery,
+        bool zoologyGalleryFishView, bool creatureGeometryView,
+        double displayReliefScale, float initialCameraZoom,
+        Vector2? initialCameraFocus, float? initialCameraAzimuthDegrees,
+        float? initialCameraElevationDegrees, ulong seed, bool synchronizeWithVsync)
     {
         _capturePath = capturePath;
         _snapshotPath = snapshotPath;
+        _savePath = Path.GetFullPath(savePath);
         _synchronizeWithVsync = synchronizeWithVsync;
         _visualEvaluation = visualEvaluation;
         _wideEvaluationView = visualEvaluation && wideEvaluationView;
@@ -311,9 +399,16 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _distanceAwareTreeLod = visualEvaluation && distanceAwareTreeLod;
         _treeQualityView = visualEvaluation && treeQualityView;
         _treeBranchesOnly = visualEvaluation && treeBranchesOnly;
+        _zoologyGallery = zoologyGallery;
+        _zoologyGalleryFishView = zoologyGalleryFishView;
+        _creatureGeometryView = creatureGeometryView;
+        _hasExplicitInitialCameraFocus = initialCameraFocus.HasValue;
+        _visualInstanceMultiplier = visualEvaluation ? Math.Clamp(visualInstanceMultiplier, 1, 10) : 1;
         _displayReliefScale = visualEvaluation ? displayReliefScale : 1.0;
         _cameraZoom = Math.Clamp(initialCameraZoom, 0.45f, MaximumCameraZoom);
         _initialCameraZoom = _cameraZoom;
+        _initialCameraAzimuthDegrees = initialCameraAzimuthDegrees;
+        _initialCameraElevationDegrees = initialCameraElevationDegrees;
         var baseEastM = visualEvaluation
             ? _wideEvaluationView || _panoramaEvaluationView || _referenceCompositionView || _referenceLandscapeView
                 ? TerrainExtentM * 0.5f + (_referenceLandscapeView ? 80f : 0f)
@@ -334,12 +429,16 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _cameraPanM = _initialCameraPanM;
         _showWaterFixtures = showWaterFixtures;
         _perspectiveProjection = perspectiveProjection;
-        _paused = visualEvaluation;
-        _showHud = capturePath is null;
+        _paused = visualEvaluation || zoologyGallery;
+        _showHud = capturePath is null && !zoologyGallery;
         _benchmarkDurationSeconds = benchmarkDurationSeconds;
+        var initialPopulation = creatureGeometryView ? new InitialAnimalPopulationV1(32, 4) : default;
         _world = _snapshotPath is null
-            ? WorldSimulation.Create(seed)
-            : WorldSimulation.Load(File.ReadAllText(_snapshotPath));
+            ? WorldSimulation.Create(seed, _cosmos, _atmosphere, _atmosphere,
+                _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere,
+                initialPopulation)
+            : WorldSimulation.Load(File.ReadAllText(_snapshotPath), _cosmos, _atmosphere, _atmosphere,
+                _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere);
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = presentationWidth,
@@ -349,7 +448,10 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
         IsFixedTimeStep = synchronizeWithVsync;
-        Window.Title = _treeQualityView ? "Procedural Tree Quality Gallery"
+        Window.Title = _zoologyGalleryFishView ? "Procedural Freshwater Fish Geometry View"
+            : _zoologyGallery ? "Procedural Creature Geometry Gallery"
+            : _creatureGeometryView ? "Zoology Creature Geometry Integration"
+            : _treeQualityView ? "Procedural Tree Quality Gallery"
             : _bakedTerrainHillshade ? "Baked Terrain Hillshade Evaluation"
             : _hybridTreeLod ? "Hybrid Tree LOD Evaluation"
             : _crossedTreeBillboards ? "Crossed Tree Billboard Evaluation"
@@ -417,6 +519,13 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             FogStart = _referenceLandscapeView ? 1200f : 620f,
             FogEnd = _referenceLandscapeView ? 3600f : 1180f
         };
+        if (_zoologyGallery)
+        {
+            BuildZoologyGalleryGeometry();
+            base.Initialize();
+            return;
+        }
+        if (_creatureGeometryView) BuildWorldCreatureGeometry();
         _treeMaterialAtlas = ProceduralTreeMaterialAtlasBuilder.Build(GraphicsDevice);
         _treeEffect = new AlphaTestEffect(GraphicsDevice)
         {
@@ -431,6 +540,25 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         };
         if (_treeBillboards) InitializeTreeBillboards();
         BuildTerrainGeometry();
+        if (_creatureGeometryView && !_hasExplicitInitialCameraFocus)
+        {
+            var visibleLandAnimals = _snapshot.Animals
+                .Where(animal => animal.PositionXM >= 0 && animal.PositionYM >= 0
+                    && animal.PositionXM < TerrainExtentM && animal.PositionYM < TerrainDepthM
+                    && IsIslandLand(animal.PositionXM / Tile, animal.PositionYM / Tile, 0))
+                .OrderByDescending(animal => _terrainHeightSampler(
+                    animal.PositionXM / Tile, animal.PositionYM / Tile))
+                .ThenBy(animal => animal.AnimalId)
+                .ToArray();
+            if (visibleLandAnimals.Length > 0)
+            {
+                var anchor = visibleLandAnimals[0];
+                _initialCameraPanM = new Vector2(
+                    (float)anchor.PositionXM - TerrainExtentM * 0.5f,
+                    (float)anchor.PositionYM - TerrainDepthM * 0.5f);
+                _cameraPanM = _initialCameraPanM;
+            }
+        }
         RefreshWaterGeometry(force: true);
         base.Initialize();
     }
@@ -441,10 +569,27 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         base.LoadContent();
     }
 
+    protected override void UnloadContent()
+    {
+        foreach (var mesh in _creatureGeometryCache.Values) mesh.Vertices.Dispose();
+        _creatureGeometryCache.Clear();
+        base.UnloadContent();
+    }
+
     protected override void Update(GameTime gameTime)
     {
         var keyboard = Keyboard.GetState();
-        var navigationChanged = UpdateCameraNavigation(gameTime, keyboard, Mouse.GetState());
+        if (_zoologyGallery)
+        {
+            if (Pressed(keyboard, Keys.Escape)) Exit();
+            _previous = keyboard;
+            base.Update(gameTime);
+            return;
+        }
+        // Benchmarks must measure the requested CLI camera, regardless of incidental input
+        // accumulated by the foreground window while the timed run is in progress.
+        var navigationChanged = _benchmarkDurationSeconds is null
+            && UpdateCameraNavigation(gameTime, keyboard, Mouse.GetState());
         if (Pressed(keyboard, Keys.Escape)) Exit();
         if (Pressed(keyboard, Keys.Space)) _paused = !_paused;
         if (Pressed(keyboard, Keys.D1)) _overlayMode = 0;
@@ -509,6 +654,19 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             _fpsFrameCount = 0;
         }
         UpdateCamera();
+        if (_zoologyGallery)
+        {
+            DrawZoologyGallery();
+            if (_capturePath is not null)
+            {
+                CaptureFrameAndExit();
+                base.Draw(gameTime);
+                return;
+            }
+            RecordBenchmarkFrame();
+            base.Draw(gameTime);
+            return;
+        }
         if (_visualEvaluation) EnsureGroundSprites();
         if (_treeBranchesOnly)
         {
@@ -567,11 +725,18 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         DrawEvaluationTreeShadows();
         DrawEvaluationTreeBillboards();
 
-        GraphicsDevice.DepthStencilState = DepthStencilState.None;
-        _batch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.AlphaBlend);
-        DrawGroundObjects();
-        _batch.End();
-        DrawFloraGeometry();
+        if (_creatureGeometryView)
+        {
+            DrawWorldCreatureGeometry();
+        }
+        else
+        {
+            GraphicsDevice.DepthStencilState = DepthStencilState.None;
+            _batch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.AlphaBlend);
+            DrawGroundObjects();
+            _batch.End();
+            DrawFloraGeometry();
+        }
         }
         if (_showHud)
         {
@@ -588,6 +753,205 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         }
         RecordBenchmarkFrame();
         base.Draw(gameTime);
+    }
+
+    private void BuildZoologyGalleryGeometry()
+    {
+        var development = new CreatureDevelopmentModelV1();
+        var geometryBuilder = new CreatureGeometryBuilderV1();
+        var quadruped = CreatureSpeciesCatalogV1.Quadruped;
+        var quadrupedGenome = development.CreateGenome(quadruped, 0x5A3447414C4C4552UL, 0x5155414452555045UL);
+        var quadrupedResult = development.Develop(quadruped, quadrupedGenome,
+            new(quadruped.MaturityDays * 2, 1, 1));
+        var quadrupedGeometry = geometryBuilder.BuildGeometry(quadrupedResult.Body,
+            quadrupedResult.VisualRecipe, 10, 12);
+        quadrupedGeometry = geometryBuilder.BuildUnifiedRenderGeometry(quadrupedResult.Body,
+            quadrupedResult.VisualRecipe, quadrupedGeometry, 10, 12);
+        var quadrupedVertices = CreatureGeometryMonoGameAdapter.Expand(quadrupedGeometry);
+        _quadrupedGalleryVertexBuffer = new VertexBuffer(GraphicsDevice,
+            VertexPositionColor.VertexDeclaration, quadrupedVertices.Length, BufferUsage.WriteOnly);
+        _quadrupedGalleryVertexBuffer.SetData(quadrupedVertices);
+        _quadrupedGalleryPrimitiveCount = quadrupedVertices.Length / 3;
+
+        var fish = CreatureSpeciesCatalogV1.FreshwaterFish;
+        var fishGenome = development.CreateGenome(fish, 0x5A3447414C4C4552UL, 0x4652455348574154UL);
+        var fishResult = development.Develop(fish, fishGenome, new(fish.MaturityDays * 2, 1, 1));
+        var fishGeometry = geometryBuilder.BuildGeometry(fishResult.Body, fishResult.VisualRecipe, 10, 12);
+        fishGeometry = geometryBuilder.BuildUnifiedRenderGeometry(fishResult.Body,
+            fishResult.VisualRecipe, fishGeometry, 10, 12);
+        var fishVertices = CreatureGeometryMonoGameAdapter.Expand(fishGeometry);
+        _fishGalleryVertexBuffer = new VertexBuffer(GraphicsDevice,
+            VertexPositionColor.VertexDeclaration, fishVertices.Length, BufferUsage.WriteOnly);
+        _fishGalleryVertexBuffer.SetData(fishVertices);
+        _fishGalleryPrimitiveCount = fishVertices.Length / 3;
+    }
+
+    private void BuildWorldCreatureGeometry()
+    {
+        foreach (var animal in _snapshot.Animals.OrderBy(value => value.AnimalId))
+            _ = GetWorldCreatureGeometry(animal);
+    }
+
+    private CreatureRenderMesh GetWorldCreatureGeometry(AnimalAgentV1 animal)
+    {
+        var genome = animal.Genome ?? _creatureDevelopment.CreateGenomeFromWorldSeed(
+            CreatureSpeciesCatalogV1.Quadruped, _snapshot.Seed, animal.AnimalId);
+        var species = CreatureSpeciesCatalogV1.Resolve(genome.SpeciesId);
+        if (species.Family != CreatureFamilyV1.Quadruped)
+            throw new InvalidOperationException("The current N3 population view only renders quadruped genomes.");
+
+        const int DevelopmentSteps = 12;
+        var developmentStep = Math.Clamp(
+            (int)Math.Floor(Math.Max(0, animal.AgeDays) / species.MaturityDays * DevelopmentSteps),
+            0, DevelopmentSteps);
+        var cacheKey = (genome.GenomeId, developmentStep);
+        if (_creatureGeometryCache.TryGetValue(cacheKey, out var cached)) return cached;
+
+        // N3 currently stores one genotype per animal, so old growth-stage buffers for this
+        // genome can be released when the visual development step advances.
+        foreach (var oldKey in _creatureGeometryCache.Keys
+                     .Where(key => key.GenomeId == genome.GenomeId && key.DevelopmentStep != developmentStep)
+                     .ToArray())
+        {
+            _creatureGeometryCache[oldKey].Vertices.Dispose();
+            _creatureGeometryCache.Remove(oldKey);
+        }
+
+        var context = new CreatureDevelopmentContextV1(
+            species.MaturityDays * developmentStep / DevelopmentSteps, 1, 1);
+        var developed = _creatureDevelopment.Develop(species, genome, context);
+        var geometry = _creatureGeometryBuilder.BuildGeometry(developed.Body, developed.VisualRecipe, 6, 8);
+        geometry = CreaturePoseGeometryAdapterV1.ApplyStaticQuadrupedStance(
+            developed.Body, geometry, _biosphere);
+        geometry = _creatureGeometryBuilder.BuildUnifiedRenderGeometry(
+            developed.Body, developed.VisualRecipe, geometry, 6, 8);
+        var vertices = CreatureGeometryMonoGameAdapter.Expand(geometry);
+        var buffer = new VertexBuffer(GraphicsDevice,
+            VertexPositionColor.VertexDeclaration, vertices.Length, BufferUsage.WriteOnly);
+        buffer.SetData(vertices);
+        var mesh = new CreatureRenderMesh(buffer, vertices.Length / 3,
+            geometry.Vertices.Min(vertex => vertex.PositionM.Y), species.ReferenceAdultBodyLengthM);
+        _creatureGeometryCache.Add(cacheKey, mesh);
+        return mesh;
+    }
+
+    private void DrawWorldCreatureGeometry()
+    {
+        _creatureGeometryDrawnCount = 0;
+        if (_snapshot.Animals.Count == 0) return;
+
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        GraphicsDevice.BlendState = BlendState.Opaque;
+        GraphicsDevice.RasterizerState = RasterizerState.CullNone;
+        GraphicsDevice.Indices = null;
+        _floraEffect.View = _view;
+        _floraEffect.Projection = _projection;
+        _floraEffect.TextureEnabled = false;
+        _floraEffect.VertexColorEnabled = true;
+        _floraEffect.LightingEnabled = false;
+        foreach (var animal in _snapshot.Animals.OrderBy(value => value.AnimalId))
+        {
+            var worldX = animal.PositionXM;
+            var worldZ = animal.PositionYM;
+            if (worldX < 0 || worldZ < 0 || worldX >= TerrainExtentM || worldZ >= TerrainDepthM) continue;
+
+            var isPredator = animal.FunctionalProfileId == AnimalFunctionalProfileV1.Predator;
+            var targetLengthM = isPredator ? 2.0 : 1.35;
+            var mesh = GetWorldCreatureGeometry(animal);
+            var scale = (float)(targetLengthM / mesh.ReferenceAdultBodyLengthM);
+            var elevation = VisualAnchorElevation(worldX / Tile, worldZ / Tile);
+            var origin = new Vector3((float)worldX,
+                (float)(elevation - mesh.MinimumY * scale), (float)worldZ);
+
+            _floraEffect.World = Matrix.CreateScale(scale) * Matrix.CreateTranslation(origin);
+            GraphicsDevice.SetVertexBuffer(mesh.Vertices);
+            foreach (var pass in _floraEffect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
+                GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, mesh.PrimitiveCount);
+            }
+            _creatureGeometryDrawnCount++;
+        }
+        GraphicsDevice.SetVertexBuffer(null);
+    }
+
+    private void DrawZoologyGallery()
+    {
+        GraphicsDevice.Clear(new Color(34, 43, 41));
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        GraphicsDevice.RasterizerState = RasterizerState.CullNone;
+        GraphicsDevice.BlendState = BlendState.Opaque;
+        GraphicsDevice.Indices = null;
+
+        var aspect = GraphicsDevice.Viewport.Width / (float)GraphicsDevice.Viewport.Height;
+        var galleryTarget = new Vector3(0, 0.35f, 0);
+        var galleryOffset = WithCameraOrbitAngles(new Vector3(0, 1.05f, 3.55f),
+            _initialCameraAzimuthDegrees, _initialCameraElevationDegrees) / _cameraZoom;
+        _view = Matrix.CreateLookAt(galleryTarget + galleryOffset, galleryTarget, Vector3.Up);
+        _projection = Matrix.CreatePerspectiveFieldOfView(0.76f, aspect, 0.05f, 30f);
+        _floraEffect.View = _view;
+        _floraEffect.Projection = _projection;
+        _floraEffect.TextureEnabled = false;
+        _floraEffect.VertexColorEnabled = true;
+        _floraEffect.LightingEnabled = false;
+
+        var floor = new[]
+        {
+            new VertexPositionColor(new(-2.2f, 0, -0.8f), new Color(65, 76, 68)),
+            new VertexPositionColor(new(-2.2f, 0, 0.8f), new Color(65, 76, 68)),
+            new VertexPositionColor(new(2.2f, 0, -0.8f), new Color(65, 76, 68)),
+            new VertexPositionColor(new(2.2f, 0, -0.8f), new Color(65, 76, 68)),
+            new VertexPositionColor(new(-2.2f, 0, 0.8f), new Color(65, 76, 68)),
+            new VertexPositionColor(new(2.2f, 0, 0.8f), new Color(65, 76, 68))
+        };
+        _floraEffect.World = Matrix.Identity;
+        foreach (var pass in _floraEffect.CurrentTechnique.Passes)
+        {
+            pass.Apply();
+            GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleList, floor, 0, 2);
+        }
+
+        if (_zoologyGalleryFishView)
+        {
+            DrawGalleryCreature(_fishGalleryVertexBuffer, _fishGalleryPrimitiveCount,
+                new Vector3(0, 0.34f, 0), 1.8f);
+        }
+        else
+        {
+            DrawGalleryCreature(_quadrupedGalleryVertexBuffer, _quadrupedGalleryPrimitiveCount,
+                new Vector3(-0.76f, 0.34f, 0), 1f);
+            DrawGalleryCreature(_fishGalleryVertexBuffer, _fishGalleryPrimitiveCount,
+                new Vector3(0.86f, 0.34f, 0), 1.8f);
+        }
+        GraphicsDevice.SetVertexBuffer(null);
+        GraphicsDevice.DepthStencilState = DepthStencilState.None;
+        _batch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.AlphaBlend);
+        if (_zoologyGalleryFishView)
+        {
+            DrawText("FRESHWATER FISH - PROCEDURAL ORBIT VIEW", 325, 42, new Color(229, 224, 196), 2);
+        }
+        else
+        {
+            DrawText("QUADRUPED PROTOTYPE", 175, 42, new Color(229, 224, 196), 2);
+            DrawText("FRESHWATER FISH - DISPLAY ZOOM 1.8X", 805, 42, new Color(229, 224, 196), 2);
+        }
+        DrawText("STATIC PROCEDURAL SURFACES / ENGINEERING MODELS", 325, 680,
+            new Color(167, 183, 170), 1);
+        _batch.End();
+    }
+
+    private void DrawGalleryCreature(VertexBuffer? vertices, int primitiveCount, Vector3 position, float scale)
+    {
+        if (vertices is null || primitiveCount == 0) return;
+        _floraEffect.World = Matrix.CreateScale(scale)
+                             * Matrix.CreateRotationY(MathHelper.PiOver2)
+                             * Matrix.CreateTranslation(position);
+        GraphicsDevice.SetVertexBuffer(vertices);
+        foreach (var pass in _floraEffect.CurrentTechnique.Passes)
+        {
+            pass.Apply();
+            GraphicsDevice.DrawPrimitives(PrimitiveType.TriangleList, 0, primitiveCount);
+        }
     }
 
     private void DrawWaterSurface(GameTime gameTime)
@@ -612,7 +976,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     {
         _waterSurfaceEffect.Parameters["WorldViewProjection"].SetValue(_view * _projection);
         _waterSurfaceEffect.Parameters["CameraPosition"].SetValue(_cameraPosition);
-        _waterSurfaceEffect.Parameters["TimeSeconds"].SetValue((float)gameTime.TotalGameTime.TotalSeconds);
+        var visualTimeSeconds = _capturePath is null ? gameTime.TotalGameTime.TotalSeconds : 0.0;
+        _waterSurfaceEffect.Parameters["TimeSeconds"].SetValue((float)visualTimeSeconds);
         _waterSurfaceEffect.Parameters["WaveAmplitude"].SetValue(waveAmplitude);
         _waterSurfaceEffect.Parameters["FogEnabled"].SetValue(_referenceLandscapeView ? 1f : 0f);
         _waterSurfaceEffect.Parameters["FogStart"].SetValue(1500f);
@@ -644,8 +1009,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void DrawCoastFoam(GameTime gameTime)
     {
         if (_coastFoamVertexBuffer is null || _coastline.Length == 0) return;
+        var visualTimeSeconds = _capturePath is null ? gameTime.TotalGameTime.TotalSeconds : 0.0;
         _coastFoamVertices = ProceduralBeachMeshBuilder.BuildWaveFoam(_coastline,
-            _terrainHeightSampler, Tile, _seaLevelM, gameTime.TotalGameTime.TotalSeconds);
+            _terrainHeightSampler, Tile, _seaLevelM, visualTimeSeconds);
         _coastFoamVertexBuffer.SetData(_coastFoamVertices, 0, _coastFoamVertices.Length, SetDataOptions.Discard);
         _waterEffect.World = Matrix.Identity;
         _waterEffect.View = _view;
@@ -665,6 +1031,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
     private void CaptureFrameAndExit()
     {
+        if (_creatureGeometryView)
+            Console.WriteLine(FormattableString.Invariant(
+                $"creatureGeometryActors={_snapshot.Animals.Count} renderedInstances={_creatureGeometryDrawnCount} uniqueGeometryBuffers={_creatureGeometryCache.Count} cameraZoom={_cameraZoom:F2} cameraTarget=({_cameraTarget.X:F2},{_cameraTarget.Y:F2},{_cameraTarget.Z:F2}) cameraPosition=({_cameraPosition.X:F2},{_cameraPosition.Y:F2},{_cameraPosition.Z:F2})"));
         var viewport = GraphicsDevice.Viewport;
         var pixels = new Color[viewport.Width * viewport.Height];
         GraphicsDevice.GetBackBufferData(pixels);
@@ -699,6 +1068,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             using var benchmarkProcess = Process.GetCurrentProcess();
             _benchmarkCpuStart = benchmarkProcess.TotalProcessorTime;
         }
+        var graphicsMetrics = GraphicsDevice.Metrics;
+        _benchmarkMaxDrawCount = Math.Max(_benchmarkMaxDrawCount, graphicsMetrics.DrawCount);
+        _benchmarkMaxPrimitiveCount = Math.Max(_benchmarkMaxPrimitiveCount, graphicsMetrics.PrimitiveCount);
         _benchmarkFrameTimesMs.Add(frameSeconds * 1000);
         _benchmarkMeasuredSeconds += frameSeconds;
         if (_benchmarkMeasuredSeconds < _benchmarkDurationSeconds.Value) return;
@@ -713,7 +1085,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         var workingSetMiB = process.WorkingSet64 / (1024.0 * 1024.0);
         var privateMemoryMiB = process.PrivateMemorySize64 / (1024.0 * 1024.0);
         Console.WriteLine(FormattableString.Invariant(
-            $"benchmark={( _visualEvaluation ? "visual-evaluation" : "desktop-l0")} projection={ProjectionName} resolution={GraphicsDevice.Viewport.Width}x{GraphicsDevice.Viewport.Height} vsync={_synchronizeWithVsync} fixedTimeStep={IsFixedTimeStep} seed={_snapshot.Seed} simulationPaused={_paused} ticksPerSecond={Speeds[_speedIndex]} warmupSeconds=5 measuredSeconds={_benchmarkMeasuredSeconds:F1} frames={ordered.Length} averageFps={averageFps:F2} p95FrameMs={p95Ms:F2} p99FrameMs={p99Ms:F2} maxFrameMs={ordered[^1]:F2} cpuPercentOfOneCore={oneCorePercent:F1} workingSetMiB={workingSetMiB:F1} privateMemoryMiB={privateMemoryMiB:F1} visibleTrees={_floraTreeCount} treeBillboards={_treeBillboardCount} treeBillboardVertices={_treeBillboardVertexCount} floraVertices={_floraVertexCount} groundCoverClusters={_groundCoverClusterCount} understoryShrubs={_understoryShrubClusterCount} shadowVertices={_evaluationShadowVertexCount} evaluationRocks={_evaluationRocks.Count} waterBuildMaxMs={_benchmarkWaterBuildMaxMs:F2} spriteBuildMaxMs={_benchmarkSpriteBuildMaxMs:F2} terrainTextureBuildMaxMs={_benchmarkTextureBuildMaxMs:F2}"));
+            $"benchmark={( _visualEvaluation ? "visual-evaluation" : "desktop-l0")} projection={ProjectionName} cameraZoom={_cameraZoom:F2} cameraPanM=({_cameraPanM.X:F1},{_cameraPanM.Y:F1}) resolution={GraphicsDevice.Viewport.Width}x{GraphicsDevice.Viewport.Height} vsync={_synchronizeWithVsync} fixedTimeStep={IsFixedTimeStep} seed={_snapshot.Seed} simulationPaused={_paused} ticksPerSecond={Speeds[_speedIndex]} visualInstanceMultiplier={_visualInstanceMultiplier} visualSceneBuildMs={_visualSceneBuildMs:F2} warmupSeconds=5 measuredSeconds={_benchmarkMeasuredSeconds:F1} frames={ordered.Length} averageFps={averageFps:F2} p95FrameMs={p95Ms:F2} p99FrameMs={p99Ms:F2} maxFrameMs={ordered[^1]:F2} cpuPercentOfOneCore={oneCorePercent:F1} workingSetMiB={workingSetMiB:F1} privateMemoryMiB={privateMemoryMiB:F1} maxDrawCountPerFrame={_benchmarkMaxDrawCount} maxPrimitivesPerFrame={_benchmarkMaxPrimitiveCount} visibleTrees={_floraTreeCount} treeBillboards={_treeBillboardCount} treeBillboardVertices={_treeBillboardVertexCount} floraVertices={_floraVertexCount} groundCoverClusters={_groundCoverClusterCount} understoryShrubs={_understoryShrubClusterCount} shadowVertices={_evaluationShadowVertexCount} evaluationRocks={_evaluationRocks.Count} faunaSprites={_faunaSpriteCount} faunaLayoutHash={_faunaLayoutHash} waterBuildMaxMs={_benchmarkWaterBuildMaxMs:F2} spriteBuildMaxMs={_benchmarkSpriteBuildMaxMs:F2} terrainTextureBuildMaxMs={_benchmarkTextureBuildMaxMs:F2}"));
         Exit();
 
         static double Percentile(double[] sorted, double percentile)
@@ -1094,6 +1466,40 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             }
         }
 
+        _faunaSpriteCount = 0;
+        _faunaLayoutHash = ProceduralAnimalSpriteBuilder.LayoutHash(_snapshot.Seed, _snapshot.Animals);
+        if (!_treeQualityView && !_creatureGeometryView)
+        {
+            foreach (var animal in _snapshot.Animals.OrderBy(value => value.AnimalId))
+            {
+                var worldX = animal.PositionXM;
+                var worldZ = animal.PositionYM;
+                if (worldX < 0 || worldZ < 0 || worldX >= TerrainExtentM || worldZ >= TerrainDepthM) continue;
+                var cellX = Math.Clamp((int)(worldX / Tile), 0, _snapshot.Width - 1);
+                var cellY = Math.Clamp((int)(worldZ / Tile), 0, _snapshot.Height - 1);
+                if (!IsIslandLand(cellX + 0.5, cellY + 0.5)) continue;
+
+                var isPredator = animal.FunctionalProfileId == AnimalFunctionalProfileV1.Predator;
+                var bodyLengthM = isPredator ? 2.0 : 1.35;
+                var bodyHeightM = isPredator ? 0.82 : 0.60;
+                var elevation = VisualAnchorElevation(worldX / Tile, worldZ / Tile);
+                var ground = ProjectGround(worldX, elevation, worldZ);
+                var left = ProjectGround(worldX - bodyLengthM * 0.5, elevation, worldZ);
+                var right = ProjectGround(worldX + bodyLengthM * 0.5, elevation, worldZ);
+                var top = ProjectGround(worldX, elevation + bodyHeightM, worldZ);
+                var minimumWidth = isPredator ? 12 : 10;
+                var minimumHeight = isPredator ? 9 : 7;
+                var width = Math.Clamp((int)Math.Ceiling(Vector2.Distance(
+                    new Vector2(left.X, left.Y), new Vector2(right.X, right.Y))), minimumWidth, 52);
+                var height = Math.Clamp((int)Math.Ceiling(Vector2.Distance(
+                    new Vector2(ground.X, ground.Y), new Vector2(top.X, top.Y))), minimumHeight, 40);
+                var variation = ProceduralAnimalSpriteBuilder.VariationFor(_snapshot.Seed, animal.AnimalId);
+                Add(new VisualKey(VisualKind.Animal, (int)animal.FunctionalProfileId, variation, VisualSeason), ground,
+                    (int)Math.Round(ground.X) - width / 2, (int)Math.Round(ground.Y) - height, width, height);
+                _faunaSpriteCount++;
+            }
+        }
+
         if (_treeQualityView)
         {
             // A render-only gallery isolates the five current architectural recipes at
@@ -1113,6 +1519,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     _floraTrees.Add(new ProceduralTreeInstance(ground, height, row, 1f, seed, VisualSeason));
             }
         }
+
+        if (!_treeQualityView && _visualInstanceMultiplier > 1)
+            ExpandVisualTreeInstances(treeFrustum);
 
         _groundSprites.Sort(static (first, second) =>
         {
@@ -1174,7 +1583,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             ? ProceduralTreeShadowMeshBuilder.Build(_floraTrees, _evaluationRocks, _terrainHeightSampler, Tile)
             : [];
         var floraVertices = groundCover.Vertices;
-        var rockVertices = _visualEvaluation ? ProceduralRockMeshBuilder.Build(_evaluationRocks) : [];
+        var rockVertices = _visualEvaluation
+            ? ProceduralRockMeshBuilder.Build(_evaluationRocks, _terrainHeightSampler, Tile)
+            : [];
         _floraTreeCount = _floraTrees.Count;
         _floraVertexCount = treeVertices.Length + floraVertices.Length;
         _groundCoverClusterCount = groundCover.Clusters;
@@ -1182,13 +1593,14 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _evaluationShadowVertexCount = shadowVertices.Length;
         _treeBillboardCount = _treeBillboards ? billboardTrees.Count : 0;
         _treeBillboardVertexCount = billboardMeshes.Sum(mesh => mesh.Vertices.Length);
+        _visualSceneBuildMs = Stopwatch.GetElapsedTime(buildStarted).TotalMilliseconds;
         if (_capturePath is not null)
         {
             var heights = _floraTrees.Select(tree => tree.Height).Order().ToArray();
             var heightAt = (double percentile) => heights.Length == 0 ? 0f
                 : heights[Math.Clamp((int)Math.Ceiling(heights.Length * percentile) - 1, 0, heights.Length - 1)];
             Console.WriteLine(FormattableString.Invariant(
-                $"floraTrees={_floraTreeCount} treeHeightP10M={heightAt(0.10):F1} treeHeightP50M={heightAt(0.50):F1} treeHeightP90M={heightAt(0.90):F1} treeBillboards={_treeBillboardCount} treeBillboardVertices={_treeBillboardVertexCount} treeMeshVertices={treeVertices.Length} groundCoverVertices={floraVertices.Length} floraVertices={_floraVertexCount} groundCoverClusters={groundCover.Clusters} understoryShrubs={groundCover.UnderstoryShrubs} shadowVertices={shadowVertices.Length} evaluationRocks={_evaluationRocks.Count}"));
+                $"cameraZoom={_cameraZoom:F2} cameraPanM=({_cameraPanM.X:F1},{_cameraPanM.Y:F1}) visualInstanceMultiplier={_visualInstanceMultiplier} visualSceneBuildMs={_visualSceneBuildMs:F2} floraTrees={_floraTreeCount} treeHeightP10M={heightAt(0.10):F1} treeHeightP50M={heightAt(0.50):F1} treeHeightP90M={heightAt(0.90):F1} treeBillboards={_treeBillboardCount} treeBillboardVertices={_treeBillboardVertexCount} treeMeshVertices={treeVertices.Length} groundCoverVertices={floraVertices.Length} floraVertices={_floraVertexCount} groundCoverClusters={groundCover.Clusters} understoryShrubs={groundCover.UnderstoryShrubs} shadowVertices={shadowVertices.Length} evaluationRocks={_evaluationRocks.Count} faunaSprites={_faunaSpriteCount} faunaLayoutHash={_faunaLayoutHash}"));
         }
         _floraVertexBuffer?.Dispose();
         _floraVertexBuffer = null;
@@ -1232,8 +1644,52 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _groundSpritesViewportWidth = viewport.Width;
         _groundSpritesViewportHeight = viewport.Height;
         _groundSpritesSeason = VisualSeason;
+        _visualSceneBuildMs = Stopwatch.GetElapsedTime(buildStarted).TotalMilliseconds;
         RecordBenchmarkBuild(buildStarted, ref _benchmarkSpriteBuildTotalMs,
             ref _benchmarkSpriteBuildMaxMs, ref _benchmarkSpriteBuildCount);
+    }
+
+    private void ExpandVisualTreeInstances(BoundingFrustum treeFrustum)
+    {
+        var sourceTrees = _floraTrees.ToArray();
+        for (var treeIndex = 0; treeIndex < sourceTrees.Length; treeIndex++)
+        {
+            var tree = sourceTrees[treeIndex];
+            for (var replica = 1; replica < _visualInstanceMultiplier; replica++)
+            {
+                var replicaId = (ulong)replica;
+                var angle = CounterRandom.Unit(_snapshot.Seed, 0x4E345343414C45UL,
+                    tree.Seed, replicaId, unchecked((ulong)_snapshot.TickIndex), 0) * Math.Tau;
+                var distance = 5f + (float)CounterRandom.Unit(_snapshot.Seed, 0x4E345343414C45UL,
+                    tree.Seed, replicaId, unchecked((ulong)_snapshot.TickIndex), 1) * 12f;
+                var x = tree.Ground.X + MathF.Cos((float)angle) * distance;
+                var z = tree.Ground.Z + MathF.Sin((float)angle) * distance;
+                if (x < 0 || z < 0 || x >= TerrainExtentM || z >= TerrainDepthM
+                    || !IsIslandLand(x / Tile, z / Tile))
+                {
+                    x = tree.Ground.X;
+                    z = tree.Ground.Z;
+                }
+
+                var elevation = x == tree.Ground.X && z == tree.Ground.Z
+                    ? tree.Ground.Y
+                    : (float)VisualAnchorElevation(x / Tile, z / Tile);
+                var ground = new Vector3(x, elevation, z);
+                var heightScale = 0.82f + (float)CounterRandom.Unit(_snapshot.Seed,
+                    0x4E345343414C45UL, tree.Seed, replicaId, unchecked((ulong)_snapshot.TickIndex), 2) * 0.36f;
+                var replicaHeight = tree.Height * heightScale;
+                if (!treeFrustum.Intersects(new BoundingSphere(
+                        ground + Vector3.Up * (replicaHeight * 0.5f), replicaHeight * 0.78f)))
+                {
+                    ground = tree.Ground;
+                    replicaHeight = tree.Height;
+                }
+
+                var replicaSeed = CounterRandom.Bits(_snapshot.Seed, 0x4E345343414C45UL,
+                    tree.Seed, replicaId, unchecked((ulong)_snapshot.TickIndex), (ulong)treeIndex);
+                _floraTrees.Add(tree with { Ground = ground, Height = replicaHeight, Seed = replicaSeed });
+            }
+        }
     }
 
     private readonly record struct TreeVisual(
@@ -1287,7 +1743,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             DrawText($"GRASS {cell.Grass.BiomassGPerM2:F0}  WOODY {cell.Woody.BiomassGPerM2:F0}  SOIL {cell.SoilWaterMm:F0}MM",
                 inspectX + 10, inspectY + 28, new Color(184, 204, 178), 1);
         }
-        DrawText($"SEED {_snapshot.Seed}   FPS {_fps:F0}   NO FAUNA IN THIS BUILD", 26, viewport.Height - 24,
+        var herbivores = _snapshot.Animals.Count(animal => animal.FunctionalProfileId == AnimalFunctionalProfileV1.Herbivore);
+        var predators = _snapshot.Animals.Count(animal => animal.FunctionalProfileId == AnimalFunctionalProfileV1.Predator);
+        DrawText($"SEED {_snapshot.Seed}   FPS {_fps:F0}   HERB {herbivores}   PRED {predators}", 26, viewport.Height - 24,
             new Color(220, 225, 210, 210), 1);
     }
 
@@ -1318,12 +1776,30 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         foreach (var cell in _snapshot.Cells)
         {
             if (!cell.Woody.Present || cell.SurfaceWaterMm >= MinimumVisibleChannelWaterMm
+                // Keep the specimen row away from the shoreline: its outer trees sit
+                // 3.6 cells from the gallery center. A dry 11x11 neighborhood also keeps
+                // an interior lake from appearing directly beneath the specimens.
+                || !IsIslandLand(cell.X + 0.5, cell.Y + 0.5, 6.0)
+                || HasVisibleWaterNearGalleryCenter(cell.X, cell.Y)
                 || cell.Woody.BiomassGPerM2 <= greatestWoodyCover)
                 continue;
             greatestWoodyCover = cell.Woody.BiomassGPerM2;
             center = new Vector2((float)((cell.X + 0.5) * Tile), (float)((cell.Y + 0.5) * Tile));
         }
         return center;
+    }
+
+    private bool HasVisibleWaterNearGalleryCenter(int centerX, int centerY)
+    {
+        const int clearanceCells = 5;
+        for (var y = centerY - clearanceCells; y <= centerY + clearanceCells; y++)
+        for (var x = centerX - clearanceCells; x <= centerX + clearanceCells; x++)
+        {
+            if (x < 0 || y < 0 || x >= _snapshot.Width || y >= _snapshot.Height) continue;
+            if (_snapshot.Cells[y * _snapshot.Width + x].SurfaceWaterMm >= MinimumVisibleChannelWaterMm)
+                return true;
+        }
+        return false;
     }
 
     private static int TreeRenderProfileRow(ulong worldSeed, int cellX, int cellY, ulong cellSeed)
@@ -1374,6 +1850,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             VisualKind.Rock => (24, 20),
             VisualKind.Grass => (18, 15),
             VisualKind.Shadow => (24, 12),
+            VisualKind.Animal => (ProceduralAnimalSpriteBuilder.Width, ProceduralAnimalSpriteBuilder.Height),
             _ => (64, 64)
         };
         var pixels = new Color[width * height];
@@ -1478,6 +1955,12 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         else if (key.Kind == VisualKind.Woody)
         {
             DrawTreePixels(pixels, width, height, key);
+        }
+        else if (key.Kind == VisualKind.Animal)
+        {
+            var animalPixels = ProceduralAnimalSpriteBuilder.Build(
+                (AnimalFunctionalProfileV1)key.Variant, key.BiomassBucket);
+            Array.Copy(animalPixels, pixels, pixels.Length);
         }
         else
         {
@@ -1863,7 +2346,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
             var originalElevation = source(east, north);
             var coastalShelf = _seaLevelM + 0.45 + Math.Min(signedDistance, 3.0) * 0.9;
-            var inlandBlend = SmoothStep(2.5, 14, signedDistance);
+            var inlandBlend = SmoothStep(2.5, 20, signedDistance);
             return coastalShelf + (originalElevation - coastalShelf) * inlandBlend;
         };
     }
@@ -2164,20 +2647,33 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
         var cellCount = SimulationState.Width * SimulationState.Height;
         var waterMm = new double[cellCount];
-        var surfaceStageM = new double[cellCount];
-        var wet = new double[cellCount];
+        var waterCells = new SurfaceWaterCellV1[cellCount];
+        var displayBedMByCell = new double[cellCount];
         for (var index = 0; index < cellCount; index++)
         {
-            waterMm[index] = _snapshot.Cells[index].SurfaceWaterMm;
             var cell = _snapshot.Cells[index];
-            surfaceStageM[index] = _terrainHeightSampler(cell.X + 0.5, cell.Y + 0.5)
-                + waterMm[index] / 1000;
-            // Render closed, topographic basins as level pools. Water outside those basins
-            // is drawn along wet D8 channel edges below, so deep channel cells do not expand
-            // into broad raster patches that erase the river's connected course.
-            wet[index] = _waterDepressionId[index] >= 0
-                ? SmoothStep(96, 420, waterMm[index])
-                : 0;
+            waterMm[index] = cell.SurfaceWaterMm;
+            waterCells[index] = new SurfaceWaterCellV1(cell.Index, cell.X, cell.Y,
+                cell.ElevationM, cell.SurfaceWaterMm, cell.GroundwaterMm);
+            displayBedMByCell[index] = _terrainHeightSampler(cell.X + 0.5, cell.Y + 0.5);
+        }
+        var poolSurface = ProceduralWaterPoolSurfaceBuilder.Build(waterCells, _waterBasins,
+            _waterDepressionId, SimulationState.CellAreaM2, displayBedMByCell);
+        var surfaceStageM = poolSurface.SurfaceStageMByCell;
+        // Render level pools from the snapshot's stored basin volume. Water outside basins
+        // is drawn along wet D8 channel edges below, not as broad raster patches.
+        var wet = poolSurface.CoverageByCell;
+        if (_capturePath is not null)
+        {
+            var wetSnapshotBasinCells = Enumerable.Range(0, cellCount)
+                .Count(index => _waterDepressionId[index] >= 0 && waterMm[index] >= 96);
+            var levelPoolCellsAtOneCm = Enumerable.Range(0, cellCount).Count(index =>
+            {
+                var poolStageM = poolSurface.PoolStageMByCell[index];
+                return double.IsFinite(poolStageM) && poolStageM - displayBedMByCell[index] >= 0.01;
+            });
+            Console.WriteLine(FormattableString.Invariant(
+                $"levelPoolBasins={poolSurface.PoolBasinCount} levelPoolComponents={poolSurface.PoolCount} levelPoolWetCells={wet.Count(value => value > 0.5)} levelPoolCellsAtOneCm={levelPoolCellsAtOneCm} snapshotWetBasinCells={wetSnapshotBasinCells}"));
         }
         wet = SmoothRenderWaterMask(wet, SimulationState.Width, SimulationState.Height);
         for (var index = 0; index < wet.Length; index++)
@@ -2252,7 +2748,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             // Interpolate the actual snapshot water-surface elevation (bed + depth) between
             // cells. Sampling a different bed height under every ribbon edge made connected
             // channels kink vertically and created visible lips at tributary junctions.
-            var surfaceHeight = SampleCellField(surfaceStageM, gridX - 0.5, gridY - 0.5) + 0.025;
+            var surfaceHeight = poolSurface.TryGetNearestPoolStage(gridX, gridY, out var poolStageM)
+                ? poolStageM + 0.025
+                : SampleCellField(surfaceStageM, gridX - 0.5, gridY - 0.5) + 0.025;
             cachedVertices[index] = new VertexPositionColor(new Vector3((float)(gridX * Tile), (float)surfaceHeight,
                 (float)(gridY * Tile)), waterColor);
             vertexReady[index] = true;
@@ -2972,7 +3470,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         // This visible cascade is a presentation fixture attached to the test watercourse and
         // a real procedural outcrop. It never implies that the current hydrology snapshot
         // contains a waterfall or writes back into the simulation.
-        if (watercourse.Count < 3) return;
+        if (watercourse.Count < 3)
+        {
+            AddControlledWaterfallFixture(vertices);
+            return;
+        }
 
         PlateauGeometry? selectedOutcrop = null;
         TerrainRimPoint selectedPoint = default;
@@ -3003,17 +3505,29 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 $"fixtureWaterfallCandidate={(selectedOutcrop?.FeatureIndex ?? -1)} rim=({selectedPoint.EastCell:F2},{selectedPoint.NorthCell:F2}) routeDistanceCells={selectedDistance:F3} routeIndex={selectedRouteIndex} dropM={selectedPoint.CrownElevationM - selectedPoint.ToeElevationM:F2}"));
 
         // Only call it an integrated fall when its lip lies on the rendered stream.
-        if (selectedOutcrop is null || selectedDistance > 1.2 || selectedRouteIndex < 0) return;
+        if (selectedOutcrop is null || selectedDistance > 1.2 || selectedRouteIndex < 0)
+        {
+            AddControlledWaterfallFixture(vertices);
+            return;
+        }
 
         var point = selectedPoint;
         var dropM = point.CrownElevationM - point.ToeElevationM;
         var topY = (float)DisplayElevation(point.CrownElevationM) + 0.18f;
         var bottomY = (float)DisplayElevation(point.ToeElevationM) + 0.30f;
-        if (topY - bottomY < 5f) return;
+        if (topY - bottomY < 5f)
+        {
+            AddControlledWaterfallFixture(vertices);
+            return;
+        }
 
         var direction = watercourse[Math.Min(selectedRouteIndex + 1, watercourse.Count - 1)]
             - watercourse[Math.Max(0, selectedRouteIndex - 1)];
-        if (direction.LengthSquared() < 1e-6f) return;
+        if (direction.LengthSquared() < 1e-6f)
+        {
+            AddControlledWaterfallFixture(vertices);
+            return;
+        }
         direction.Normalize();
         var acrossRiver = new Vector2(-direction.Y, direction.X);
         var rimCenter = new Vector2((float)(point.EastCell * Tile), (float)(point.NorthCell * Tile));
@@ -3093,6 +3607,133 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             vertices.Add(new VertexPositionColor(first, poolColor));
             vertices.Add(new VertexPositionColor(second, poolColor));
         }
+    }
+
+    private void AddControlledWaterfallFixture(List<VertexPositionColor> vertices)
+    {
+        // Evaluation-only fallback: choose a real generated outcrop and show a short
+        // controlled flow over its authored height discontinuity. This remains a visual
+        // fixture; it does not read or mutate a hydrologic flow field.
+        PlateauGeometry? selectedOutcrop = null;
+        TerrainRimPoint selectedPoint = default;
+        var selectedDrop = double.NegativeInfinity;
+        foreach (var feature in TerrainModel.GenerateOutcropGeometries(_snapshot.Seed))
+        foreach (var candidate in feature.Rim)
+        {
+            var drop = candidate.CrownElevationM - candidate.ToeElevationM;
+            if (drop < 8 || drop <= selectedDrop
+                || !IsIslandLand(candidate.EastCell, candidate.NorthCell, -0.5)) continue;
+            selectedOutcrop = feature;
+            selectedPoint = candidate;
+            selectedDrop = drop;
+        }
+
+        if (selectedOutcrop is null) return;
+
+        var featureGeometry = selectedOutcrop;
+        var point = selectedPoint;
+        var radial = Vector2.Normalize(new Vector2(
+            (float)(point.EastCell - featureGeometry.CenterEastCell),
+            (float)(point.NorthCell - featureGeometry.CenterNorthCell)));
+        if (!float.IsFinite(radial.X) || !float.IsFinite(radial.Y) || radial.LengthSquared() < 1e-6f)
+            radial = Vector2.UnitX;
+        var rim = new Vector2((float)(point.EastCell * Tile), (float)(point.NorthCell * Tile));
+        var cameraDirection = new Vector2(_cameraPosition.X - rim.X, _cameraPosition.Z - rim.Y);
+        if (cameraDirection.LengthSquared() < 1e-6f) cameraDirection = Vector2.UnitY;
+        else cameraDirection.Normalize();
+        var across = new Vector2(-cameraDirection.Y, cameraDirection.X);
+        var topY = (float)DisplayElevation(point.CrownElevationM) + 0.24f;
+        var bottomY = (float)DisplayElevation(point.ToeElevationM) + 0.34f;
+        var dropM = topY - bottomY;
+        if (dropM < 5f) return;
+
+        // A narrow feeder ribbon lies on the plateau and meets the vertical sheet at its lip.
+        const int feederSections = 8;
+        const float feederHalfWidthM = 4.4f;
+        var colors = new[]
+        {
+            new Color(55, 108, 119, 222), new Color(70, 129, 136, 232),
+            new Color(95, 151, 145, 220), new Color(70, 124, 133, 230),
+            new Color(49, 94, 107, 220)
+        };
+        for (var section = 0; section < feederSections; section++)
+        {
+            var firstT = section / (float)feederSections;
+            var secondT = (section + 1f) / feederSections;
+            var firstCenter = rim - radial * (34f * (1 - firstT)) + radial * 1.2f;
+            var secondCenter = rim - radial * (34f * (1 - secondT)) + radial * 1.2f;
+            var firstLeft = firstCenter + across * feederHalfWidthM;
+            var firstRight = firstCenter - across * feederHalfWidthM;
+            var secondLeft = secondCenter + across * feederHalfWidthM;
+            var secondRight = secondCenter - across * feederHalfWidthM;
+            float SurfaceY(Vector2 position)
+                => (float)Math.Min(DisplayElevation(_terrainHeightSampler(position.X / Tile, position.Y / Tile)), topY - 0.08f);
+            var a = new Vector3(firstLeft.X, SurfaceY(firstLeft), firstLeft.Y);
+            var b = new Vector3(firstRight.X, SurfaceY(firstRight), firstRight.Y);
+            var c = new Vector3(secondLeft.X, SurfaceY(secondLeft), secondLeft.Y);
+            var d = new Vector3(secondRight.X, SurfaceY(secondRight), secondRight.Y);
+            var color = colors[1 + section % 3];
+            vertices.Add(new VertexPositionColor(a, color));
+            vertices.Add(new VertexPositionColor(c, color));
+            vertices.Add(new VertexPositionColor(b, color));
+            vertices.Add(new VertexPositionColor(b, color));
+            vertices.Add(new VertexPositionColor(c, color));
+            vertices.Add(new VertexPositionColor(d, color));
+        }
+
+        const int rows = 14;
+        const int columns = 6;
+        var sheetCenter = rim + radial * 1.7f;
+        var sheet = new Vector3[rows + 1, columns + 1];
+        for (var row = 0; row <= rows; row++)
+        for (var column = 0; column <= columns; column++)
+        {
+            var vertical = row / (float)rows;
+            var lateral = (column / (float)columns - 0.5f) * 16f;
+            var flutter = MathF.Sin(vertical * MathF.PI * 2.3f + column * 0.68f) * 0.34f;
+            var position = sheetCenter + across * lateral + radial * (0.25f + vertical * 0.95f + flutter);
+            sheet[row, column] = new Vector3(position.X, topY + (bottomY - topY) * vertical, position.Y);
+        }
+
+        for (var row = 0; row < rows; row++)
+        for (var column = 0; column < columns; column++)
+        {
+            var a = sheet[row, column];
+            var b = sheet[row, column + 1];
+            var c = sheet[row + 1, column];
+            var d = sheet[row + 1, column + 1];
+            var color = colors[column % colors.Length];
+            vertices.Add(new VertexPositionColor(a, color));
+            vertices.Add(new VertexPositionColor(c, color));
+            vertices.Add(new VertexPositionColor(b, color));
+            vertices.Add(new VertexPositionColor(b, color));
+            vertices.Add(new VertexPositionColor(c, color));
+            vertices.Add(new VertexPositionColor(d, color));
+        }
+
+        // The pool is placed just beyond the physical toe and levelled to the local ground.
+        var poolCenter2 = rim + radial * 15f;
+        var poolGroundM = DisplayElevation(_terrainHeightSampler(poolCenter2.X / Tile, poolCenter2.Y / Tile));
+        var poolCenter = new Vector3(poolCenter2.X, (float)(poolGroundM + 0.42), poolCenter2.Y);
+        const int poolSegments = 32;
+        for (var segment = 0; segment < poolSegments; segment++)
+        {
+            var firstAngle = MathF.Tau * segment / poolSegments;
+            var secondAngle = MathF.Tau * (segment + 1) / poolSegments;
+            var first = poolCenter + new Vector3(radial.X * MathF.Cos(firstAngle) * 14f
+                + across.X * MathF.Sin(firstAngle) * 8f, 0, radial.Y * MathF.Cos(firstAngle) * 14f
+                + across.Y * MathF.Sin(firstAngle) * 8f);
+            var second = poolCenter + new Vector3(radial.X * MathF.Cos(secondAngle) * 14f
+                + across.X * MathF.Sin(secondAngle) * 8f, 0, radial.Y * MathF.Cos(secondAngle) * 14f
+                + across.Y * MathF.Sin(secondAngle) * 8f);
+            vertices.Add(new VertexPositionColor(poolCenter, colors[2]));
+            vertices.Add(new VertexPositionColor(first, colors[1]));
+            vertices.Add(new VertexPositionColor(second, colors[3]));
+        }
+
+        if (_capturePath is not null)
+            Console.WriteLine(FormattableString.Invariant(
+                $"controlledWaterfallFixture=true outcrop={featureGeometry.FeatureIndex} rim=({point.EastCell:F2},{point.NorthCell:F2}) physicalDropM={point.CrownElevationM - point.ToeElevationM:F2} displayDropM={dropM:F2} feederSections={feederSections} sheetRows={rows} sheetColumns={columns} poolSegments={poolSegments}"));
     }
 
     private void AddEvaluationLakeFixture(List<VertexPositionColor> vertices, Vector2 downstreamCell)
@@ -3322,6 +3963,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     : _panoramaEvaluationView
                         ? new Vector3(0f, 430f, 360f)
                         : new Vector3(0, 350f, 250f);
+            cameraOffset = WithCameraOrbitAngles(cameraOffset,
+                _initialCameraAzimuthDegrees, _initialCameraElevationDegrees);
             var evaluationEye = evaluationTarget + cameraOffset / _cameraZoom;
             _cameraTarget = evaluationTarget;
             _cameraPosition = evaluationEye;
@@ -3346,13 +3989,22 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         var mapCenterEastM = TerrainExtentM * 0.5f;
         var mapCenterNorthM = TerrainDepthM * 0.5f;
         ClampCameraPan(mapCenterEastM, mapCenterNorthM);
-        var target = new Vector3(mapCenterEastM + _cameraPanM.X,
-            (float)_centerElevationM, mapCenterNorthM + _cameraPanM.Y);
+        var targetEastM = mapCenterEastM + _cameraPanM.X;
+        var targetNorthM = mapCenterNorthM + _cameraPanM.Y;
+        var targetElevationM = _creatureGeometryView
+            ? _terrainHeightSampler(targetEastM / Tile, targetNorthM / Tile)
+            : _centerElevationM;
+        var target = new Vector3(targetEastM, (float)targetElevationM, targetNorthM);
         var horizontal = 1050f;
         var elevation = 1350f;
-        var viewHeight = 550f;
-        var viewWidth = 680f;
-        var eye = target + new Vector3(0, elevation, horizontal) / _cameraZoom;
+        // The creature diagnostic is an inspection view, so use a tighter, aspect-correct
+        // orthographic field without changing the normal world's camera framing.
+        var viewHeight = _creatureGeometryView ? 80f : 550f;
+        var viewportAspect = GraphicsDevice.Viewport.Width / (float)GraphicsDevice.Viewport.Height;
+        var viewWidth = _creatureGeometryView ? viewHeight * viewportAspect : 680f;
+        var worldCameraOffset = WithCameraOrbitAngles(new Vector3(0, elevation, horizontal),
+            _initialCameraAzimuthDegrees, _initialCameraElevationDegrees);
+        var eye = target + worldCameraOffset / _cameraZoom;
         _cameraTarget = target;
         _cameraPosition = eye;
         viewHeight /= _cameraZoom;
@@ -3360,6 +4012,23 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _treeLodProjectionScale = GraphicsDevice.Viewport.Height / viewHeight;
         _view = Matrix.CreateLookAt(eye, target, Vector3.Up);
         _projection = Matrix.CreateOrthographic(viewWidth, viewHeight, 1f, 4000f);
+    }
+
+    private static Vector3 WithCameraOrbitAngles(
+        Vector3 defaultOffset,
+        float? azimuthDegrees,
+        float? elevationDegrees)
+    {
+        if (!azimuthDegrees.HasValue && !elevationDegrees.HasValue) return defaultOffset;
+        var horizontalDistance = MathF.Sqrt(defaultOffset.X * defaultOffset.X + defaultOffset.Z * defaultOffset.Z);
+        var radius = defaultOffset.Length();
+        var defaultAzimuth = MathF.Atan2(defaultOffset.X, defaultOffset.Z);
+        var defaultElevation = MathF.Atan2(defaultOffset.Y, horizontalDistance);
+        var azimuth = MathHelper.ToRadians(azimuthDegrees ?? MathHelper.ToDegrees(defaultAzimuth));
+        var elevation = MathHelper.ToRadians(elevationDegrees ?? MathHelper.ToDegrees(defaultElevation));
+        var horizontal = radius * MathF.Cos(elevation);
+        return new(horizontal * MathF.Sin(azimuth), radius * MathF.Sin(elevation),
+            horizontal * MathF.Cos(azimuth));
     }
 
     private bool UpdateCameraNavigation(GameTime gameTime, KeyboardState keyboard, MouseState mouse)
@@ -3569,7 +4238,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void LoadWorld()
     {
         if (!File.Exists(_savePath)) return;
-        _world = WorldSimulation.Load(File.ReadAllText(_savePath));
+        _world = WorldSimulation.Load(File.ReadAllText(_savePath), _cosmos, _atmosphere, _atmosphere,
+            _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere);
         _snapshot = _world.Snapshot();
         RefreshHydrologyPresentationFields();
         _groundSpritesRevision = -1;
@@ -3581,9 +4251,12 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
     private void RefreshHydrologyPresentationFields()
     {
-        var terrain = _snapshot.Cells.ToArray();
+        var terrain = _snapshot.Cells.Select(cell => new SurfaceWaterCellV1(
+            cell.Index, cell.X, cell.Y, cell.ElevationM, cell.SurfaceWaterMm, cell.GroundwaterMm)).ToArray();
         _surfaceDrainage = SurfaceWaterModel.AnalyzeDrainage(terrain);
-        _waterDepressionId = SurfaceWaterModel.AnalyzeHydrology(terrain).DepressionId;
+        var hydrology = SurfaceWaterModel.AnalyzeHydrology(terrain);
+        _waterDepressionId = hydrology.DepressionId;
+        _waterBasins = hydrology.Basins;
     }
 
     protected override void Dispose(bool disposing)
@@ -3630,7 +4303,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private sealed record TerrainRenderChunk(VertexBuffer Vertices, IndexBuffer Indices, int PrimitiveCount, BoundingBox Bounds);
     private sealed record TerrainColorRenderChunk(VertexBuffer Vertices, IndexBuffer Indices, int PrimitiveCount, BoundingBox Bounds);
     private sealed record TreeBillboardRenderBatch(int RenderProfileRow, VertexBuffer Vertices, int PrimitiveCount);
-    private enum VisualKind : byte { Rock, Grass, Woody, Shadow }
+    private enum VisualKind : byte { Rock, Grass, Woody, Shadow, Animal }
     private readonly record struct VisualKey(VisualKind Kind, int Variant, int BiomassBucket, Season Season);
 }
 

@@ -3,14 +3,14 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Game.Client.Desktop;
 
-/// <summary>Builds tree bark, foliage-cluster and species leaf textures from deterministic pixel rules.</summary>
+/// <summary>Builds deterministic bark, leaf, and opaque distant-crown materials from pixel rules.</summary>
 internal static class ProceduralTreeMaterialAtlasBuilder
 {
     private const int CellSize = 256;
     private const int Gutter = 2;
     private const int Step = CellSize + Gutter * 2;
     private const int SpeciesCount = 5;
-    private const int MaterialCount = 3;
+    private const int MaterialCount = 4;
     private const float Tau = MathF.PI * 2;
     private static readonly Vector2[] MapleVeinTips =
     [
@@ -39,6 +39,7 @@ internal static class ProceduralTreeMaterialAtlasBuilder
     private static Color[] BuildTile(int species, int material)
     {
         if (material == 1) return BuildCanopyTile(species);
+        if (material == 3) return BuildCanopyMassTile(species);
 
         var pixels = new Color[CellSize * CellSize];
         for (var y = 0; y < CellSize; y++)
@@ -55,11 +56,32 @@ internal static class ProceduralTreeMaterialAtlasBuilder
         return pixels;
     }
 
+    private static Color[] BuildCanopyMassTile(int species)
+    {
+        // Distant crown volumes need a solid, deterministic leaf material. Individual
+        // leaf cutouts remain in material 1; this tile supplies opaque foliage at LOD0.
+        var pixels = new Color[CellSize * CellSize];
+        var phase = species * 0.731f;
+        for (var y = 0; y < CellSize; y++)
+        for (var x = 0; x < CellSize; x++)
+        {
+            var u = x / (float)(CellSize - 1);
+            var v = y / (float)(CellSize - 1);
+            var broadMottle = PeriodicNoise(u, v, 9, species + 127);
+            var fineMottle = PeriodicNoise(u, v, 23, species + 193);
+            var rib = MathF.Sin(Tau * (u * 3.2f + v * 2.1f + phase)) * 0.018f;
+            var tone = Math.Clamp(0.91f + (broadMottle - 0.5f) * 0.12f
+                + (fineMottle - 0.5f) * 0.055f + rib, 0.78f, 1f);
+            var value = (byte)Math.Clamp((int)MathF.Round(tone * 255f), 0, 255);
+            pixels[y * CellSize + x] = new Color(value, value, value, (byte)255);
+        }
+        return pixels;
+    }
+
     private static Color[] BuildCanopyTile(int species)
     {
-        // Each small card now contains an actual procedural leaf cluster. This keeps the
-        // branchlet silhouette readable when close, while the renderer can still collapse
-        // the whole cluster into a few textured planes at medium and map distances.
+        // Procedural twig and leaf pigments are sampled on individual leaf blades and
+        // branch-local 3D foliage masses; the tile never stores a complete tree impostor.
         var pixels = new Color[CellSize * CellSize];
         var twigCount = species == 1 ? 20 : species == 4 ? 14 : 16;
         var leavesPerTwig = species == 1 ? 20 : 18;
@@ -182,6 +204,18 @@ internal static class ProceduralTreeMaterialAtlasBuilder
         else if (species == 1) // Pine: long, narrow scales and shallow grooves.
         {
             tone -= MathF.Pow(MathF.Max(0, MathF.Sin(Tau * (u * 12f + v * 0.24f + phase))), 12f) * 0.10f;
+        }
+        else if (species == 3) // Field maple: short, broken flakes and corky ridges.
+        {
+            var flakes = MathF.Sin(Tau * (v * 8.5f + 0.14f * MathF.Sin(Tau * u * 3.1f + phase)));
+            var breaks = MathF.Pow(MathF.Max(0, MathF.Sin(Tau * (u * 7.2f + v * 0.42f + phase))), 9f);
+            tone -= MathF.Pow(MathF.Max(0, flakes), 8f) * (0.035f + breaks * 0.11f);
+        }
+        else if (species == 4) // Willow: fine, elongated fibrous grooves.
+        {
+            var fibres = MathF.Sin(Tau * (u * 13.5f + 0.12f * MathF.Sin(Tau * v * 1.4f + phase)));
+            tone -= MathF.Pow(MathF.Max(0, fibres), 14f) * 0.075f;
+            tone += MathF.Sin(Tau * (v * 2.0f + phase * 0.3f)) * 0.025f;
         }
 
         var value = (byte)Math.Clamp((int)MathF.Round(tone * 255f), 0, 255);

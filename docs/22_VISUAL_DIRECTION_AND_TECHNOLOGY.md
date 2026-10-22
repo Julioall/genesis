@@ -1,6 +1,6 @@
 # Direção visual e técnicas de apresentação no MonoGame
 
-**Status:** stack MonoGame confirmada; requisitos visuais aceitos; técnica de apresentação em avaliação. **Revisão:** 21/10/2026. Este documento orienta a validação visual dentro do MonoGame; a implementação completa do cliente continua condicionada ao gate visual.
+**Status:** stack MonoGame confirmada; árvores e vegetação do mundo seguem por geometria 3D procedural; qualidade visual ainda em avaliação. **Revisão:** 22/10/2026. Este documento orienta a validação visual dentro do MonoGame; a implementação completa do cliente continua condicionada ao gate visual.
 
 ## Referências visuais
 
@@ -32,6 +32,8 @@ O céu procedural foi removido da apresentação atual porque a faixa visível n
 
 O objetivo é um mundo natural procedural, reconhecível, coerente e visualmente rico. A estilização pode simplificar superfícies, materiais e silhuetas, mas deve preservar a leitura de profundidade, volume, escala relativa, relevo e relações entre terreno, água, rocha e vegetação. Aparência low-poly, sprites, tiles, câmera top-down e projeção ortográfica são opções de técnica, não requisitos.
 
+Para árvores e demais objetos naturais do mundo, o requisito confirmado pelo usuário é construir a forma com geometria 3D procedural. Sprites e billboards de árvores não substituem seus modelos; as capturas híbridas anteriores ficam apenas como comparação histórica.
+
 O resultado deve cumprir estas necessidades:
 
 - Representar elevações, declives, encostas, vales, platôs e paredes rochosas com geometria ou uma técnica que demonstre resultado equivalente.
@@ -54,9 +56,9 @@ A dimensionalidade da simulação é uma decisão de cada processo. Grades de el
 
 | Abordagem | Vantagens para este projeto | Custos e riscos | Tratamento nesta revisão |
 |---|---|---|---|
-| 2D por sprites/camadas | Baixo custo inicial; encaixa bem com campos em grade, inspeção e desenhos determinísticos | Profundidade, paredes, água em desníveis e espécies volumétricas dependem de composição, ordem e arte específica; maior adaptação para técnicas geométricas | Permanece elegível se provar a qualidade e a variedade exigidas |
-| Híbrida/2.5D | Pode combinar malha de elevação com elementos 2D, projeções ou geometria limitada; transição incremental a partir do protótipo atual | Ordenação, oclusão, âncoras, sombras e mudanças de câmera podem exigir exceções por tipo de objeto; qualidade depende da composição | Candidata legítima para comparação, sem compromisso com as decisões atuais |
-| 3D estilizado | Geometria, câmeras, luz, sombras, instanciamento e níveis de detalhe podem atender diretamente a vários elementos da referência; bibliotecas 3D procedurais podem ser usadas sem converter o core | Requer geração e gestão de malhas, materiais, água, distribuição e custo de GPU; 3D por si só não garante boa direção artística ou desempenho | Primeira hipótese a validar, não decisão definitiva |
+| 2D por sprites/camadas | Baixo custo inicial; encaixa bem com campos em grade, inspeção e desenhos determinísticos | Profundidade, paredes, água em desníveis e espécies volumétricas dependem de composição, ordem e arte específica; maior adaptação para técnicas geométricas | Não substitui árvores ou objetos naturais 3D; pode ser considerada para interfaces e sobreposições |
+| Híbrida/2.5D | Pode combinar malha de elevação com elementos 2D, projeções ou geometria limitada; transição incremental a partir do protótipo atual | Ordenação, oclusão, âncoras, sombras e mudanças de câmera podem exigir exceções por tipo de objeto; qualidade depende da composição | Comparação histórica; billboards de árvore estão fora da direção de produção |
+| 3D estilizado | Geometria, câmeras, luz, sombras, instanciamento e níveis de detalhe atendem diretamente aos objetos naturais volumétricos; bibliotecas 3D procedurais podem ser usadas sem converter o core | Requer geração e gestão de malhas, materiais, água, distribuição e custo de GPU; 3D por si só não garante boa direção artística ou desempenho | Direção selecionada para árvores e objetos naturais; gate visual continua aberto |
 
 Para a validação, comparar câmera ortográfica e perspectiva elevada. A escolha de projeção e ângulo deve vir da leitura do mundo e dos resultados observados. O cliente pode carregar um save/snapshot reproduzível com `--snapshot-file <caminho>`; em `--visual-evaluation`, ele é pausado e apresentado sem avançar a simulação. Isso permite comparar estações e estados ecológicos realmente produzidos pelo modelo, em vez de forçar uma estação somente no renderer.
 
@@ -71,10 +73,10 @@ MonoGame é um framework C#/.NET com APIs para gráficos 2D e 3D, efeitos/shader
 | Técnica | Aplicação no MonoGame | Pontos a medir |
 |---|---|---|
 | **3D estilizado por malhas** | Terreno elevado, rochas, água, árvores e vegetação como geometria procedural; câmera, luz, materiais e shaders no cliente MonoGame. | Qualidade de volume e silhueta, custo de geração de malha, draw calls, sombras, memória e desempenho. |
-| **Híbrida: terreno 3D e elementos 2D** | Malha para relevo e água com billboards/sprites ou elementos planos para folhagem, detalhes e marcadores. | Legibilidade em diferentes ângulos, ordenação, oclusão, escala, custo de conteúdo e coerência das sombras. |
+| **Híbrida: terreno 3D e elementos 2D** | Comparação histórica; billboards e sprites não representam árvores na direção selecionada. | Não é candidata de produção para árvores; outros usos de interface são avaliados separadamente. |
 | **2D em camadas** | Sprites, polígonos e composição em camadas projetadas, mantendo a cena e as ferramentas no MonoGame. | Se profundidade, paredões, água em desníveis e diversidade de espécies atendem aos critérios visuais e permitem inspeção clara. |
 
-Começar pela prova de 3D estilizado em MonoGame e avaliar a composição híbrida como alternativa de custo. A direção artística pode combinar malhas, shaders, primitivas, texturas e sprites gerados proceduralmente por código desenvolvido com IA, desde que os recursos sejam rastreáveis, reproduzíveis e utilizáveis sem depender de pacotes artísticos prontos. A escolha entre técnicas depende da cena demonstrativa, do custo de implementação, do desempenho e dos alvos de distribuição aprovados; a stack MonoGame permanece fixa.
+Seguir com geometria 3D gerada proceduralmente em MonoGame para árvores e objetos naturais. Malhas, primitivas, materiais, shaders e texturas procedurais podem ser combinados desde que sejam rastreáveis, reproduzíveis e não dependam de pacotes artísticos prontos. Billboards e sprites de árvores permanecem fora da direção selecionada; o custo, a qualidade visual e os alvos de distribuição ainda precisam passar pelos gates definidos. A stack MonoGame permanece fixa.
 
 ## Validação visual comparativa
 
@@ -106,6 +108,20 @@ Antes de consolidar o cliente de N4, produzir uma cena demonstrativa procedural 
 | Licença | Inventário das bibliotecas, ferramentas e recursos gerados com licença/SPDX, avisos de redistribuição e limitações por plataforma. |
 
 Anexar capturas em enquadramento comum, configuração completa, resultados brutos, inventário de componentes e esforço de implementação. Se nenhuma técnica cumprir os gates, registrar o gargalo e ajustar a técnica ou o escopo visual dentro do MonoGame, com justificativa. Não reduzir o modelo científico para favorecer uma abordagem de renderização.
+
+### Evidência de execução — 22/10/2026
+
+A comparação 3D/híbrida em seed 1 e ambas as projeções, com janelas Release de 60 s e câmera fixa, a rubrica visual, os hashes determinísticos das seeds 1–3 e os benchmarks ativo e 10× estão registrados no [relatório N4 de integração visual](reports/N4_VISUAL_INTEGRATION_2026-10-22.md). Os gates locais de desempenho passaram nesta máquina; a rubrica visual não passou. A cachoeira demonstrativa continua sendo apenas uma fixture de renderização.
+
+Na iteração 49, o LOD de paisagem passou a usar massas de copa procedurais opacas ligadas aos brotos, reduzindo 7,6% dos vértices de flora na captura comparável sem mudar a fauna ou a simulação. A captura [N4 — copa procedural distante](reports/evidence/iteration-49-distant-canopy-volume.png) mostra melhor preenchimento, mas ainda revela aglomerados arredondados. A vegetação não recebe aprovação visual nesta etapa; consulte o [relatório da iteração 49](reports/PROCEDURAL_TREE_CANOPY_VOLUME_ITERATION_49_2026-10-22.md).
+
+Na iteração 50, a opacidade central das sombras arbóreas aumentou sem alterar geometria ou luz; o resultado mudou pixels, mas ainda não torna a profundidade legível o suficiente para aprovação. Veja a [captura N4 de copas e sombras](reports/evidence/iteration-50-canopy-shadow.png) e o [relatório da iteração 50](reports/PROCEDURAL_TREE_SHADOWS_ITERATION_50_2026-10-22.md).
+
+Na iteração 52, os troncos ganharam alargamento basal e seção irregular por perfil, com lean, curva, número e ângulo dos galhos variando por seed. Casca e silhueta foram diferenciadas entre carvalho, pinheiro, bétula, bordo e salgueiro. Raízes aparentes passaram a ser opcionais e específicas do perfil, nunca um acessório uniforme; são apenas um efeito visual porque o snapshot não expõe solo/erosão por árvore. A captura com folhagem registra 1.891.152 vértices nas cinco árvores e zero billboards. A vista sem folhas facilita comparar os troncos e registrou 251.568 vértices. Consulte [captura próxima das cinco árvores](reports/evidence/n4-tree-trunk-roots-iteration52-zoom38.png), [estrutura sem folhagem](reports/evidence/n4-tree-trunk-branches-only-iteration52-zoom56.png) e o [relatório da iteração 52](reports/PROCEDURAL_TREE_GEOMETRY_ITERATION_52_2026-10-22.md). O build Release passou com 0 avisos e 0 erros; a vegetação permanece sem aprovação visual N4.
+
+Na iteração 56, o LOD distante de folhas largas passou a usar 80 faces por lobo e iluminação interpolada por vértice. A perspectiva de seed 1/dia 172 passou 60 s a 60 FPS, mas as copas ainda leem como cachos arredondados; o critério visual não foi elevado e N4 continua aberto. Evidências em [perspectiva](reports/evidence/n4-seed1-day172-smooth-canopy-iteration56-perspective.png), [ortográfica](reports/evidence/n4-seed1-day172-smooth-canopy-iteration56-orthographic.png) e [relatório da iteração 56](reports/PROCEDURAL_TREE_CANOPY_SMOOTHING_ITERATION_56_2026-10-22.md).
+
+Na iteração 57, as rochas de avaliação passaram a acompanhar a normal local até 25°, ganharam base parcialmente enterrada e fechada, e topo irregular. O contato com o relevo melhorou em detalhe, mas as rochas ainda parecem pequenas e facetadas na vista ampla; N4 permanece aberto. A revisão combinada manteve 59,98 FPS em 60 s na máquina de referência. Veja as capturas [ampla](reports/evidence/n4-seed1-day172-slope-seated-rocks-iteration57.png), [aproximada](reports/evidence/n4-seed1-day172-slope-seated-rocks-detail-iteration57.png) e o [relatório da iteração 57](reports/PROCEDURAL_ROCK_SLOPE_CONTACT_ITERATION_57_2026-10-22.md).
 
 ## Impacto no roadmap
 

@@ -1,0 +1,61 @@
+# Auditoria de dados — herança e adaptação Z5
+
+**Data da busca:** 2026-10-22
+
+**Pergunta:** que evidência sustenta herdar variação de tamanho, crescimento e pigmentação, e quais populações concretas têm pedigree e fenótipos úteis para calibrar os perfis de Zoology?
+
+## Síntese da busca
+
+SciSpace encontrou evidência de herança quantitativa de tamanho e pigmentação, mas também mostrou que a expressão depende da idade, do ambiente e da população estudada. A consulta não fornece um coeficiente de mutação, regra de acasalamento, compatibilidade reprodutiva ou distribuição genética universal para os protótipos do Gênesis.
+
+- Wilson et al. analisaram crescimento e tamanho em uma população de ovelhas Soay. A herdabilidade e a covariância genética variaram ao longo da ontogenia; mudanças ambientais e maternas puderam mascarar a resposta genética no fenótipo observado. Os resultados apoiam separar genótipo, desenvolvimento e ambiente, mas não calibram os perfis genéricos atuais. [Artigo, Evolutionary Ecology (2007)](https://doi.org/10.1007/s10682-006-9106-z).
+- Westphal e Morgan encontraram trajetórias de pigmentação herdáveis diferentes em duas populações de cobra-liga-comum; a variação genética e a trajetória durante o desenvolvimento não foram iguais entre as populações. Isso não sustenta uma regra genérica de cor para qualquer vertebrado. [Artigo, Journal of Heredity (2010)](https://doi.org/10.1093/jhered/esq044).
+- Schweizer et al. estudaram um alelo melanístico específico em lobos norte-americanos e sua história de introgressão/seleção. É um exemplo de pigmentação com base genética identificável em um locus e população determinados, não uma arquitetura transferível para todas as espécies. [Artigo, Molecular Biology and Evolution (2018)](https://doi.org/10.1093/molbev/msy031).
+- Diniz-Filho et al. demonstraram uma abordagem de genética quantitativa em modelo individual para evolução do tamanho corporal em ilhas. O trabalho é um exemplo de modelagem explícita; seus parâmetros e ótimo ambiental pertencem àquele experimento e não são valores padrão do Gênesis. [Artigo, Biology Letters (2019)](https://doi.org/10.1098/rsbl.2019.0481).
+
+## Decisão de implementação
+
+1. Persistir um genoma versionado em cada agente N3 e criar fundadores por `worldSeed + AnimalId`, com streams determinísticos da implementação Z1.
+2. Para descendentes, usar a regra que o N3 já possui: reprodução uniparental com custo de reservas. Aplicar a mutação limitada Z1 ao genoma do progenitor e guardar o ID do genoma parental. Isso integra a linhagem existente; **não afirma que os vertebrados genéricos do projeto se reproduzem clonalmente na natureza**.
+3. Não alterar sobrevivência, metabolismo, crescimento, movimento ou escolha de parceiros em função dos alelos. Sem população de referência, esses efeitos não estão calibrados e não constituem seleção natural sobre os traços genéticos.
+4. Migrar saves antigos gerando genomas de fundador determinísticos. O schema de mundo passa a 3; Z1 permanece renderer-neutral e N3 continua proprietário do estado persistido do animal.
+
+## Dependências não resolvidas
+
+- Escolher espécie/população e seus dados de parentesco, idade reprodutiva, dimorfismo, fecundidade, compatibilidade, crescimento e variação dos traços.
+- Decidir o regime reprodutivo por espécie. Recombinação sexual, número de progenitores, sexos, escolha de parceiro, endogamia e transmissão materna não são representados pelo subgate atual.
+- Calibrar ligação genótipo-fenótipo e plasticidade; pigmentação e anatomia ainda não são consumidas pelo ecossistema N3. Tamanho, isolamento térmico e crescimento não afetam os fluxos N3.
+- Validar deriva, seleção, estrutura populacional, persistência e extinção ao longo de muitas gerações sem fitness global imposto.
+
+## Limites da consulta
+
+A busca é orientativa e não exaustiva. Os estudos citados são evidência de populações e mecanismos particulares. A ausência de parâmetros universais nesta consulta não demonstra que tais dados não existam; qualquer calibração futura requer uma espécie-alvo e métodos/populações compatíveis.
+
+## Triagem de populações de referência — SciSpace, 2026-10-22
+
+Uma busca dirigida por populações monitoradas individualmente encontrou candidatos concretos. Ela melhora a decisão de pesquisa, mas não torna os valores transferíveis entre espécies nem autoriza substituir automaticamente os perfis genéricos atuais.
+
+- **Ovelhas Soay de St Kilda (Hirta/Village Bay):** melhor candidata encontrada para uma referência de herbívoro quadrúpede. A população tem acompanhamento de longo prazo, pedigree com mais de 1.800 mães e quase 400 pais estimados geneticamente no estudo de Milner et al.; massa corporal, comprimento da perna traseira e largura da arcada incisiva apresentaram herdabilidade baixa, mas significativa. Ignorar efeitos maternos superestimou a herdabilidade, em especial nas fêmeas. [Milner et al. (2000)](https://doi.org/10.1046/J.1420-9101.2000.00222.X). Wilson et al. estimaram efeitos maternos para peso ao nascer (`m² = 0,119`), data de nascimento (`m² = 0,197`) e tamanho da ninhada (`m² = 0,211`); modelos mal especificados superestimaram a variância genética aditiva em até 6,45 vezes para data de nascimento. [Wilson et al. (2004)](https://doi.org/10.1111/J.1420-9101.2004.00824.X). Estudos posteriores com SNPs descrevem peso/jaw como traços poligênicos e mostram arquitetura diferente entre proxies de tamanho, reforçando que não se deve reduzir todo o fenótipo a um único gene. [Bérénos et al. (2014)](https://doi.org/10.1111/MEC.12827), [Bérénos et al. (2015)](https://doi.org/10.1111/MEC.13146).
+- **Gray-sided vole (`Myodes rufocanus`), Sapporo:** dataset detalhado de 920 nascimentos em 215 ninhadas, em recinto externo de 3 ha, com pais atribuídos, sexo, datas estimadas de nascimento/morte, peso e estado reprodutivo; o monitoramento ocorreu quinzenalmente entre 1992 e 1994, com parentagem baseada em 3–5 loci microssatélites. Cinquenta e uma ninhadas tiveram múltiplos pais. É útil para estudar atribuição de parentagem e sistema de acasalamento, mas o período curto e o recinto não fornecem por si só uma calibração multigeracional de herdabilidade para o quadrúpede do Gênesis. [Ishibashi & Saitoh (2023)](https://doi.org/10.1111/1440-1703.12431).
+- **Salmão Chinook (`Oncorhynchus tshawytscha`), duas populações reintroduzidas no Oregon:** pedigrees genéticos multigeracionais sustentam estimativas de herdabilidade/evolutividade para comprimento e idade à maturidade, época de chegada à desova e sucesso reprodutivo ao longo da vida. O material acessível nesta busca não fornece o tamanho amostral nem detalhes suficientes para extrair parâmetros numéricos. Além disso, o ciclo anádromo não corresponde ao peixe residente de água doce do protótipo atual. [Evans et al. (2019)](https://doi.org/10.1007/S10592-019-01174-4).
+- **Urso polar da Baía de Hudson Ocidental:** pedigree genético de 4.449 animais ao longo de seis gerações, com atribuições de maternidade e paternidade e validação por SNPs em um subconjunto; o artigo encontrado não liga esse pedigree a parâmetros quantitativos dos traços requeridos para esta etapa. É referência metodológica, não candidato de calibração do perfil atual. [Malenfant et al. (2016)](https://doi.org/10.1007/S00300-015-1871-0).
+
+### Decisão de escopo após a busca
+
+Manter **Soay de St Kilda como candidato explícito para uma futura calibração específica de herbívoro quadrúpede**, sem mapear a população real para o agente herbívoro N3 nem copiar sua herdabilidade para predadores, peixes ou outros traços. Chinook fica como candidato aquático separado, condicionado a representar anadromia; não valida o atual peixe residente. Nenhuma população encontrada cobre as duas funções terrestres, o peixe e todos os traços genéticos/ambientais necessários. O próximo trabalho de Z5 é extrair e versionar um pacote de dados de referência por população e só então definir o modelo de herança correspondente; até lá, a reprodução uniparental N3 continua marcada como protótipo técnico.
+
+## Auditoria do depósito de Soay — Dryad 2014
+
+A página do depósito [Bérénos et al. (2014), Dryad DOI 10.5061/dryad.367s2](https://datadryad.org/dataset/doi%3A10.5061%2Fdryad.367s2) confirma um registro público com licença CC0 e lista tabelas de peso ao nascer, medidas esqueléticas e capturas nas variantes rotuladas `oldpedigree`/`newpedigree`, além de `pedigree1dryad`, `pedigree2dryad`, arquivos de leitura e dados SNP. O resumo descreve os pedigrees 1 e 2 e a comparação com parentesco genômico de 37.037 SNPs; os dois pedigrees usam evidências de atribuição parental diferentes. Isso torna este depósito um candidato mais promissor para vincular fenótipo e parentesco do que conjuntos encontrados em registros separados.
+
+Essa ligação ainda é uma **inferência a partir do inventário**, não uma validação das chaves. A página pública confirma os nomes e tamanhos das tabelas e dos READMEs; a resposta pública também confirma a distinção dos pedigrees 1 e 2 e o uso de 37.037 SNPs. A listagem de metadados da API foi lida sem autenticação, mas nenhuma tabela ou README foi baixado: `GET /api/v2/files/{id}/download` respondeu `401` com a mensagem `Unauthorized, must have current bearer token`, e os links `downloads/file_stream/{id}` responderam `403`. A documentação oficial atual do Dryad especifica que downloads de arquivos exigem token, enquanto consultas de metadados permanecem disponíveis anonimamente ([API REST](https://github.com/datadryad/dryad-app/blob/main/documentation/apis/README.md), [autenticação e downloads](https://github.com/datadryad/dryad-app/blob/main/documentation/apis/api_accounts.md)).
+
+Consequentemente, README, colunas, unidades, idades, cobertura de indivíduos e chaves entre tabelas continuam sem validação direta; nenhum arquivo de fenótipo ou genótipo foi processado ou copiado para o repositório. Não se atribuem parâmetros numéricos ao Gênesis e ainda não há pacote local reproduzível. Para destravar, é necessário usar um token Dryad autorizado ou encontrar uma cópia pública equivalente. Depois disso, a primeira extração pode se limitar aos READMEs e tabelas pequenas de fenótipo/pedigree; não é necessário baixar os arquivos genômicos grandes nessa fase. O inventário e o resumo do depósito podem ser consultados na [página Dryad do conjunto](https://datadryad.org/dataset/doi%3A10.5061%2Fdryad.367s2).
+
+## Rechecagem de acesso e evidência publicada — 22/10/2026
+
+A consulta direta ao endpoint REST de metadados do Dryad confirmou, sem autenticação, a versão publicada 2, a licença CC0 e o índice paginado com 36 entradas. O inventário inclui `README.txt`, READMEs por tabela, peso ao nascer, captura, esqueleto e pedigree, além dos arquivos SNP/GRM. O tamanho total reportado pelo registro é 1.284.555.332 bytes. Em seguida tentei obter nove arquivos pequenos (READMEs e tabelas individuais) pelos links oficiais `/api/v2/files/{id}/download`; todos retornaram HTTP 401. Portanto, o bloqueio é de acesso aos conteúdos dos arquivos, não de descoberta do conjunto nem do tamanho dos arquivos selecionados.
+
+Como alternativa para a **descrição agregada**, o texto integral do [artigo de Bérénos et al. (2014) no PubMed Central](https://pmc.ncbi.nlm.nih.gov/articles/PMC4149785/) está disponível. Ele descreve a população de Village Bay em Hirta, monitorada desde 1985; cordeiros pesados poucos dias após nascer; capturas de agosto para medidas de massa e membros; e medidas esqueléticas post-mortem. As análises separam neonatos, cordeiros, yearlings e adultos e comparam pedigree observacional, pedigree atribuído por SNPs e parentesco genômico. Os resultados agregados indicam que a herdabilidade depende de idade, traço e matriz de parentesco, e que efeitos maternos importam nos traços juvenis.
+
+Essa fonte permite documentar a população candidata e analisar qualitativamente a arquitetura dos traços, mas não revela colunas e chaves reais dos arquivos, observações individuais nem parâmetros de mutação. Não foi feito mapeamento do herbívoro N3 para Soay. O subgate Z5 continua bloqueado para calibração individual e reprodução específica; a linhagem técnica uniparental atual permanece intacta até que uma população-alvo e suas regras reprodutivas sejam definidas.

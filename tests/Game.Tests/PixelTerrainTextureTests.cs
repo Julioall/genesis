@@ -14,7 +14,7 @@ public sealed class PixelTerrainTextureTests
     [Fact]
     public void Ground_texture_is_repeatable_and_contains_procedural_surface_variation()
     {
-        var snapshot = WorldSimulation.Create(1).Snapshot();
+        var snapshot = TestWorldFactory.Create(1).Snapshot();
         var first = PixelTerrainTexture.Generate(snapshot, pixelsPerCell: 4, overlayMode: 0, visualSeason: Season.Summer);
         var repeat = PixelTerrainTexture.Generate(snapshot, pixelsPerCell: 4, overlayMode: 0, visualSeason: Season.Summer);
 
@@ -27,7 +27,7 @@ public sealed class PixelTerrainTextureTests
     [InlineData(8)]
     public void Grass_autotile_is_seeded_connected_and_stays_inside_living_cells(int detail)
     {
-        var snapshot = WorldSimulation.Create(1).Snapshot();
+        var snapshot = TestWorldFactory.Create(1).Snapshot();
         var field = PixelTerrainTexture.BuildGrassAutotile(snapshot, detail);
         var repeat = PixelTerrainTexture.BuildGrassAutotile(snapshot, detail);
 

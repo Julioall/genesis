@@ -1,0 +1,16 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Cosmos",
+  "roadmapPhase": "N1",
+  "gateStatus": "validated",
+  "scope": "L0 solar geometry",
+  "ownedProcesses": [
+    "solar direction and top-of-atmosphere irradiance"
+  ],
+  "ownedPersistentFields": [],
+  "providesCapabilities": [
+    "ISolarForcingV1"
+  ],
+  "coreMediatedInputs": [],
+  "validationPending": []
+}

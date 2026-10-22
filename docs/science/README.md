@@ -18,6 +18,7 @@ docs/
 - [Physics](Physics.md): fluxos de massa e energia, radiação, calor, mecânica e água.
 - [Chemistry](Chemistry.md): nutrientes, matéria orgânica, transformações e conservação de espécies químicas modeladas.
 - [Biology](Biology.md): fisiologia, metabolismo, crescimento, reprodução, competição, mortalidade e ecossistemas.
+- [Morfogênese computacional e vida artificial](Biology/Morphogenesis-and-Artificial-Life.md): fundamentos para desenvolvimento, anatomia funcional, padrões e vida artificial; não é alegação de validação biológica do modelo.
 
 ## Documentar a teoria não significa criar um módulo de simulação
 

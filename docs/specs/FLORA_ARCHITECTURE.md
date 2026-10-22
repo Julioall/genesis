@@ -8,8 +8,9 @@ Pesquisa comparativa: [referências de geração procedural de árvores — iter
 
 ## Divisão de responsabilidades
 
-- `Game.Modules.Biosphere.ProceduralTreeGenerator` recebe perfil, altura, maturidade visual, detalhe e seed; devolve segmentos conectados de tronco/galhos e locais de inserção foliar. Perfis de folhas largas recebem brotos adicionais por uma passagem limitada de Space Colonization dentro do envelope da copa.
+- `Game.Modules.Biosphere.ProceduralTreeGenerator` recebe perfil, altura, maturidade visual, detalhe e seed; devolve segmentos conectados de tronco/galhos, locais foliares e `TreeRootTraits` do perfil biológico correspondente. As características radiculares ficam separadas da receita de malha, embora ainda usem o ID do arquétipo porque o snapshot não publica identidade individual de espécie. Perfis de folhas largas recebem brotos adicionais por uma passagem limitada de Space Colonization dentro do envelope da copa.
 - `TreeRenderProfile` guarda parâmetros arquitetônicos, morfologia foliar e um hábito foliar coarse (`decídua`/`perene`) para as receitas visuais atuais. A geração não consulta câmera, GPU, relevo gráfico ou `MonoGame`.
+- Os perfis agora diferenciam também o afilamento e alargamento basal do tronco, sua irregularidade e curvatura, a sustentação dos galhos e a expressão visual opcional de raízes. Esses controles são presets artísticos por arquétipo; não são coeficientes medidos.
 - `TreeRenderProfile.CrownShape` determina um envelope qualitativo para o comprimento dos galhos primários (famílias cônica, esférica, hemisférica e cilíndrica); os perfis são arquétipos visuais e os fatores ainda não foram ajustados a medições de táxons.
 - O preenchimento por Space Colonization começa na ponta terminal real dos galhos primários. Os pontos de atração continuam limitados a um envelope geométrico; não simulam busca por luz, competição ou crescimento temporal.
 - Os perfis incluem um padrão qualitativo opcional de tamanho de folha ao longo da copa. O renderer o reduz a uma variação pequena e limitada no tamanho das lâminas de bétula e carvalho; é um proxy visual direcional baseado em um estudo de 29 árvores, não um coeficiente calibrado nem uma resposta à estação/ambiente. Ver [pesquisa de arquitetura de copa](../15_RESEARCH.md#gradiente-vertical-do-tamanho-foliar).
@@ -23,17 +24,19 @@ As seeds visuais derivam da seed do mundo e da célula, sem consumir o fluxo ale
 
 | Perfil | Organização atual |
 |---|---|
-| Carvalho | Eixo principal, galhos largos e copa espalhada |
-| Pinheiro | Eixo dominante, ramos em espiral e forma cônica |
-| Bétula | Tronco fino, copa vertical e ramos ascendentes |
-| Bordo | Galhos distribuídos por níveis e copa arredondada |
-| Salgueiro | Copa ampla com inclinação pendente nos ramos distais |
+| Carvalho | Tronco robusto com alargamento basal irregular, galhos principais largos, copa hemisférica espalhada e maior expressão radicular superficial |
+| Pinheiro | Líder central mais reto e afilado, ramos em verticilos e copa cônica; sem raízes aparentes no perfil de referência |
+| Bétula | Tronco fino e pálido, copa estreita e alta e ramos ascendentes; raízes aparentes omitidas no perfil de referência |
+| Bordo | Tronco moderadamente alargado e curvo, mais ramificações distribuídas numa copa arredondada e expressão radicular intermediária |
+| Salgueiro | Base moderadamente robusta, copa baixa e ampla, ramos distais longos e pendentes e expressão radicular discreta |
 
 As ramificações usam níveis de ordem crescente, afunilamento e curvaturas determinísticas. Segmentos contíguos da mesma ordem compartilham uma malha varrida com seção transversal transportada ao longo da curva. A relação entre raio do tronco e raio dos galhos primários é configurável por perfil; o renderer alarga a primeira seção do galho e interpola uma expansão curta no tronco e nos galhos primários onde brotos maiores se inserem. Galhos finos mantêm conexões tubulares simples para limitar o crescimento da malha. Os pontos foliares ficam nos ramos secundários e terminais. Os tubos ainda não se fundem topologicamente nos nós; os colares suavizam a leitura das junções maiores, mas interseções continuam visíveis de perto. A iteração 44 registrou 212.952 vértices de galhos para cinco árvores na vista isolada; não houve medição de FPS.
 
+Os troncos têm uma base proporcionalmente mais espessa, com flares mais fortes em carvalho e bordo e taper mais estreito em pinheiro e bétula. A seção tubular do tronco recebe flutes e assimetria de baixa frequência, enquanto lean, curva e ordem dos galhos variam por seed; as sementes não são compartilhadas entre indivíduos. A Biosfera mantém `TreeRootTraits` como fenótipo radicular por perfil, incluindo `SurfaceRootExpressionPotential`: expressão, alcance lateral, espessura e distribuição não são um acessório universal nem uma rolagem genérica do renderer. No perfil atual, raízes aparentes são fortes no carvalho, intermediárias no bordo, discretas no salgueiro e omitidas na referência visual de pinheiro e bétula. Os valores são arquétipos provisórios, não coeficientes botânicos medidos. Esse potencial biológico não torna a exposição inevitável; ela também depende de solo descoberto/erosão, dados que o snapshot ainda não fornece. Ver [15_RESEARCH.md](../15_RESEARCH.md#raízes-superficiais-e-exposição).
+
 ## Limites declarados
 
-Esta etapa implementa perfis paramétricos, um grafo hierárquico e uma passagem de Space Colonization com orçamento fixo de brotos por indivíduo. Os atratores definem um envelope geométrico da copa; ainda não representam competição observada por luz, nem crescimento temporal. Ainda não implementa L-Systems, plasticidade do crescimento, idade persistida no estado ecológico, raízes simuladas, vento, sombras projetadas de copa, cache de módulos ou impostores distantes. O LOD atual só reduz ramos e folhagem em objetos menores na tela. A malha de folhas é uma aproximação estilizada; ela não equivale à fisiologia ou anatomia validada de espécies reais.
+Esta etapa implementa perfis paramétricos, um grafo hierárquico e uma passagem de Space Colonization com orçamento fixo de brotos por indivíduo. Os atratores definem um envelope geométrico da copa; ainda não representam competição observada por luz, nem crescimento temporal. Ainda não implementa L-Systems, plasticidade do crescimento, idade persistida no estado ecológico, modelo ou interação de raízes com o solo, vento, sombras projetadas de copa, cache de módulos ou impostores distantes. A malha de raízes aparentes é somente apresentação e não cobre todas as árvores. O LOD atual só reduz ramos e folhagem em objetos menores na tela. A malha de folhas é uma aproximação estilizada; ela não equivale à fisiologia ou anatomia validada de espécies reais.
 
 O snapshot contém biomassa lenhosa agregada por célula de 100 m², sem altura, diâmetro ou idade de cada árvore. A apresentação usa essa biomassa como proxy de cobertura da copa e aplica alturas de exibição por perfil de espécie, competição local e variação determinística por indivíduo visual. Esses valores são heurísticas de renderer, não alometria validada nem estágios etários simulados. Uma representação real de idades e crescimento individual depende de dados por organismo no contrato da Biosfera.
 

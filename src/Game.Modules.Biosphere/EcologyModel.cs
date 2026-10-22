@@ -2,60 +2,64 @@ using Game.Contracts;
 
 namespace Game.Modules.Biosphere;
 
-public readonly record struct DailyEcologyResult(
-    WorldCell Cell, double DetritusRespirationGPerM2, double SoilOrganicMatterRespirationGPerM2);
-
 public static class EcologyModel
 {
-    public static DailyEcologyResult CloseDay(WorldCell cell, double meanAirTemperatureC)
+    public static EcologyDetritusStateV1 ConfirmDetritusDeposit(
+        EcologyDetritusStateV1 current,
+        EcologyDetritusStateV1 proposedDeposit)
     {
-        var grass = ClosePlantDay(cell.Grass, cell.GrassWaterFactorSum / 24,
-            cell.GrassNitrogenFactorSum / 24, cell.GrassTemperatureFactorSum / 24,
-            cell.GrassOutOfRangeHours / 24, 600);
-        var woody = ClosePlantDay(cell.Woody, cell.WoodyWaterFactorSum / 24,
-            cell.WoodyNitrogenFactorSum / 24, cell.WoodyTemperatureFactorSum / 24,
-            cell.WoodyOutOfRangeHours / 24, 1800);
+        if (!double.IsFinite(current.DryGPerM2) || current.DryGPerM2 < 0
+            || !double.IsFinite(current.NitrogenGPerM2) || current.NitrogenGPerM2 < 0
+            || !double.IsFinite(proposedDeposit.DryGPerM2) || proposedDeposit.DryGPerM2 < 0
+            || !double.IsFinite(proposedDeposit.NitrogenGPerM2) || proposedDeposit.NitrogenGPerM2 < 0
+            || !double.IsFinite(current.DryGPerM2 + proposedDeposit.DryGPerM2)
+            || !double.IsFinite(current.NitrogenGPerM2 + proposedDeposit.NitrogenGPerM2))
+            throw new ArgumentOutOfRangeException(nameof(proposedDeposit),
+                "Detritus deposits must be finite and non-negative.");
+        return new(current.DryGPerM2 + proposedDeposit.DryGPerM2,
+            current.NitrogenGPerM2 + proposedDeposit.NitrogenGPerM2);
+    }
+
+    public static EcologyDailyResultV1 CloseDay(EcologyDailyInputV1 input)
+    {
+        var plants = input.Botany.Plants;
+        var factors = input.Botany.DailyFactors;
+        var grass = ClosePlantDay(plants.Grass, factors.GrassWaterFactorSum / 24,
+            factors.GrassNitrogenFactorSum / 24, factors.GrassTemperatureFactorSum / 24,
+            factors.GrassOutOfRangeHours / 24, 600);
+        var woody = ClosePlantDay(plants.Woody, factors.WoodyWaterFactorSum / 24,
+            factors.WoodyNitrogenFactorSum / 24, factors.WoodyTemperatureFactorSum / 24,
+            factors.WoodyOutOfRangeHours / 24, 1800);
 
         var deadDry = grass.DeadDry + woody.DeadDry;
         var deadN = grass.DeadN + woody.DeadN;
-        var soil = cell with
-        {
-            Grass = grass.Patch,
-            Woody = woody.Patch,
-            DetritusDryGPerM2 = cell.DetritusDryGPerM2 + deadDry,
-            DetritusNitrogenGPerM2 = cell.DetritusNitrogenGPerM2 + deadN
-        };
+        var detritusDry = input.DetritusDryGPerM2 + deadDry;
+        var detritusNitrogen = input.DetritusNitrogenGPerM2 + deadN;
 
-        var fTemperature = Math.Clamp(Math.Pow(2, (meanAirTemperatureC - 20) / 10), 0.25, 2.50);
-        var fWater = Math.Clamp((soil.SoilWaterMm - soil.SoilWiltMm)
-            / (0.5 * (soil.SoilCapacityMm - soil.SoilWiltMm)), 0, 1);
+        var fTemperature = Math.Clamp(Math.Pow(2, (input.MeanAirTemperatureC - 20) / 10), 0.25, 2.50);
+        var fWater = Math.Clamp((input.SoilMoisture.SoilWaterMm - input.SoilMoisture.WiltMm)
+            / (0.5 * (input.SoilMoisture.CapacityMm - input.SoilMoisture.WiltMm)), 0, 1);
         var litterRate = 0.008 * fTemperature * fWater;
         var litterFraction = 1 - Math.Exp(-litterRate);
-        var decayedDry = soil.DetritusDryGPerM2 * litterFraction;
-        var decayedN = soil.DetritusNitrogenGPerM2 * litterFraction;
+        var decayedDry = detritusDry * litterFraction;
+        var decayedN = detritusNitrogen * litterFraction;
         var soilMatterRate = 0.0004 * fTemperature * fWater;
         var soilMatterFraction = 1 - Math.Exp(-soilMatterRate);
-        var soilMatterLoss = soil.SoilOrganicMatterGPerM2 * soilMatterFraction;
-        var soilNitrogenRelease = soil.SoilOrganicNitrogenGPerM2 * soilMatterFraction;
+        var soilMatterLoss = input.SoilBiogeochemistry.SoilOrganicMatterGPerM2 * soilMatterFraction;
+        var soilNitrogenRelease = input.SoilBiogeochemistry.SoilOrganicNitrogenGPerM2 * soilMatterFraction;
 
-        var result = soil with
+        var updatedBotany = input.Botany with
         {
-            DetritusDryGPerM2 = soil.DetritusDryGPerM2 - decayedDry,
-            DetritusNitrogenGPerM2 = soil.DetritusNitrogenGPerM2 - decayedN,
-            SoilOrganicMatterGPerM2 = soil.SoilOrganicMatterGPerM2 + 0.25 * decayedDry - soilMatterLoss,
-            SoilOrganicNitrogenGPerM2 = soil.SoilOrganicNitrogenGPerM2 + 0.70 * decayedN - soilNitrogenRelease,
-            MineralNitrogenGPerM2 = soil.MineralNitrogenGPerM2 + 0.30 * decayedN + soilNitrogenRelease,
-            GrassWaterFactorSum = 0,
-            GrassNitrogenFactorSum = 0,
-            GrassTemperatureFactorSum = 0,
-            GrassOutOfRangeHours = 0,
-            WoodyWaterFactorSum = 0,
-            WoodyNitrogenFactorSum = 0,
-            WoodyTemperatureFactorSum = 0,
-            WoodyOutOfRangeHours = 0
+            Plants = new PlantPatchPair(grass.Patch, woody.Patch),
+            DailyFactors = default
         };
 
-        return new(result, 0.75 * decayedDry, soilMatterLoss);
+        var soilProposal = new SoilBiogeochemistryProposalV1(
+            input.SoilBiogeochemistry.SoilOrganicMatterGPerM2 + 0.25 * decayedDry - soilMatterLoss,
+            input.SoilBiogeochemistry.SoilOrganicNitrogenGPerM2 + 0.70 * decayedN - soilNitrogenRelease,
+            input.SoilBiogeochemistry.MineralNitrogenGPerM2 + 0.30 * decayedN + soilNitrogenRelease);
+        return new(updatedBotany, detritusDry - decayedDry, detritusNitrogen - decayedN,
+            soilProposal, 0.75 * decayedDry, soilMatterLoss);
     }
 
     private static (PlantPatch Patch, double DeadDry, double DeadN) ClosePlantDay(

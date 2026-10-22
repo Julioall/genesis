@@ -52,18 +52,6 @@ public static class TerrainModel
     public static double Elevation(int x, int y, ulong seed)
         => new TerrainGenerator(seed).Elevation(x + 0.5, y + 0.5);
 
-    public static (double East, double North) Gradient(WorldCell[] cells, int x, int y)
-    {
-        ArgumentNullException.ThrowIfNull(cells);
-        if (cells.Length != SimulationState.Width * SimulationState.Height)
-            throw new ArgumentException("Terrain gradients need one elevation per simulation cell.", nameof(cells));
-
-        double At(int px, int py) => cells[py * SimulationState.Width + px].ElevationM;
-        var gradient = GridGradient(At, x, y);
-        var cellSizeM = Math.Sqrt(SimulationState.CellAreaM2);
-        return (gradient.East / cellSizeM, gradient.North / cellSizeM);
-    }
-
     public static double SlopeMagnitude(double[] elevations, int x, int y)
     {
         ArgumentNullException.ThrowIfNull(elevations);
@@ -72,34 +60,81 @@ public static class TerrainModel
         if (x < 0 || x >= SimulationState.Width || y < 0 || y >= SimulationState.Height)
             throw new ArgumentOutOfRangeException(nameof(x), "Slope coordinates must be inside the terrain grid.");
 
-        double At(int px, int py) => elevations[py * SimulationState.Width + px];
-        var gradient = GridGradient(At, x, y);
+        var gradient = GridGradient(elevations, x, y);
         var cellSizeM = Math.Sqrt(SimulationState.CellAreaM2);
         return Math.Sqrt(gradient.East * gradient.East + gradient.North * gradient.North) / cellSizeM;
     }
 
-    public static double TerrainSolarFactor(WorldCell[] cells, WorldCell cell, double sunEast, double sunNorth, double sunUp)
+    public static double TerrainSolarFactor(
+        double[] elevationsM, int x, int y, double sunEast, double sunNorth, double sunUp)
     {
-        var gradient = Gradient(cells, cell.X, cell.Y);
-        var length = Math.Sqrt(gradient.East * gradient.East + gradient.North * gradient.North + 1);
-        var normalEast = -gradient.East / length;
-        var normalNorth = -gradient.North / length;
+        ArgumentNullException.ThrowIfNull(elevationsM);
+        if (elevationsM.Length != SimulationState.Width * SimulationState.Height)
+            throw new ArgumentException("Terrain solar exposure needs one elevation per simulation cell.", nameof(elevationsM));
+        return TerrainSolarFactor(CreateTerrainSolarNormal(elevationsM, x, y), sunEast, sunNorth, sunUp);
+    }
+
+    public static TerrainSolarNormalV1[] CreateTerrainSolarNormals(double[] elevationsM)
+    {
+        ArgumentNullException.ThrowIfNull(elevationsM);
+        var cellCount = SimulationState.Width * SimulationState.Height;
+        if (elevationsM.Length != cellCount)
+            throw new ArgumentException("Terrain solar exposure needs one elevation per simulation cell.", nameof(elevationsM));
+        var normals = new TerrainSolarNormalV1[cellCount];
+        for (var index = 0; index < cellCount; index++)
+            normals[index] = CreateTerrainSolarNormal(elevationsM, index % SimulationState.Width,
+                index / SimulationState.Width);
+        return normals;
+    }
+
+    public static double[] TerrainSolarFactors(
+        TerrainSolarNormalV1[] normals, double sunEast, double sunNorth, double sunUp)
+    {
+        ArgumentNullException.ThrowIfNull(normals);
+        var cellCount = SimulationState.Width * SimulationState.Height;
+        if (normals.Length != cellCount)
+            throw new ArgumentException("Terrain solar normals must match the L0 world grid.", nameof(normals));
+        var factors = new double[cellCount];
+        if (sunUp <= 0) return factors;
+        for (var index = 0; index < cellCount; index++)
+            factors[index] = TerrainSolarFactor(normals[index], sunEast, sunNorth, sunUp);
+        return factors;
+    }
+
+    private static TerrainSolarNormalV1 CreateTerrainSolarNormal(double[] elevationsM, int x, int y)
+    {
+        var gridGradient = GridGradient(elevationsM, x, y);
+        var cellSizeM = Math.Sqrt(SimulationState.CellAreaM2);
+        var eastGradient = gridGradient.East / cellSizeM;
+        var northGradient = gridGradient.North / cellSizeM;
+        var length = Math.Sqrt(eastGradient * eastGradient + northGradient * northGradient + 1);
+        var normalEast = -eastGradient / length;
+        var normalNorth = -northGradient / length;
         var normalUp = 1 / length;
+        return new(normalEast, normalNorth, normalUp);
+    }
+
+    private static double TerrainSolarFactor(TerrainSolarNormalV1 normal,
+        double sunEast, double sunNorth, double sunUp)
+    {
         if (sunUp <= 0) return 0;
-        return Math.Clamp(Math.Max(0, normalEast * sunEast + normalNorth * sunNorth + normalUp * sunUp)
+        return Math.Clamp(Math.Max(0, normal.East * sunEast + normal.North * sunNorth + normal.Up * sunUp)
                           / Math.Max(sunUp, 0.05), 0, 1.2);
     }
 
-    private static (double East, double North) GridGradient(Func<int, int, double> at, int x, int y)
+    private static (double East, double North) GridGradient(double[] elevations, int x, int y)
     {
         if (x < 0 || x >= SimulationState.Width || y < 0 || y >= SimulationState.Height)
             throw new ArgumentOutOfRangeException(nameof(x), "Gradient coordinates must be inside the terrain grid.");
-        var east = x == 0 ? at(1, y) - at(0, y)
-            : x == SimulationState.Width - 1 ? at(x, y) - at(x - 1, y)
-            : (at(x + 1, y) - at(x - 1, y)) / 2;
-        var north = y == 0 ? at(x, 1) - at(x, 0)
-            : y == SimulationState.Height - 1 ? at(x, y) - at(x, y - 1)
-            : (at(x, y + 1) - at(x, y - 1)) / 2;
+        var east = x == 0 ? elevations[y * SimulationState.Width + 1] - elevations[y * SimulationState.Width]
+            : x == SimulationState.Width - 1
+                ? elevations[y * SimulationState.Width + x] - elevations[y * SimulationState.Width + x - 1]
+                : (elevations[y * SimulationState.Width + x + 1] - elevations[y * SimulationState.Width + x - 1]) / 2;
+        var north = y == 0 ? elevations[SimulationState.Width + x] - elevations[x]
+            : y == SimulationState.Height - 1
+                ? elevations[y * SimulationState.Width + x] - elevations[(y - 1) * SimulationState.Width + x]
+                : (elevations[(y + 1) * SimulationState.Width + x]
+                    - elevations[(y - 1) * SimulationState.Width + x]) / 2;
         return (east, north);
     }
 
@@ -238,7 +273,7 @@ public static class TerrainModel
                         (normalizedY + range.Phase) * 0.42));
                 var summitRhythm = 0.62 + 0.38 * Math.Pow(0.5 + 0.5 * Math.Sin(y * 0.34 / _scaleY + range.Phase * 1.3), 1.4);
                 var rangeEnds = SmoothStep(-2 * _scaleY, 7 * _scaleY, y)
-                    * (1 - SmoothStep((SimulationState.Height - 8 * _scaleY), SimulationState.Height, y));
+                    * (1 - SmoothStep(SimulationState.Height - 8 * _scaleY, SimulationState.Height, y));
                 height += range.AmplitudeM * (0.76 * shoulder + 0.24 * crest)
                     * brokenMassif * summitRhythm * rangeEnds;
 

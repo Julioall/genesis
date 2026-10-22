@@ -26,7 +26,7 @@ internal static class ProceduralTreeShadowMeshBuilder
             var center = new Vector3(displaced.X,
                 (float)elevationSampler(displaced.X / cellSizeM, displaced.Y / cellSizeM) + 0.055f,
                 displaced.Y);
-            var inner = new Color(19, 29, 25, 38);
+            var inner = new Color(19, 29, 25, 56);
             var outer = new Color(19, 29, 25, 0);
 
             for (var segment = 0; segment < segments; segment++)

@@ -6,7 +6,8 @@
 
 | Grandeza ou estoque | Owner | Consultantes e pedidos | Forma |
 |---|---|---|---|
-| Tempo, dia, estação astronômica, irradiância acima da atmosfera | Cosmos | todos | snapshot espacial/temporal |
+| Tick lógico, agenda, janela temporal e dia/estação L0 derivados do tick | Game.Core | todos; calendário puro compartilhado em Contracts | estado temporal e snapshots |
+| Geometria solar e irradiância acima da atmosfera para um dia/hora fornecidos | Cosmos | Atmosphere, Geosphere, Biosphere | amostra solar instantânea |
 | Temperatura/umidade do ar, vento, nuvens, precipitação gerada | Atmosphere | Soil, SurfaceWater, Botany, Zoology | campos; chuva como fluxo de fronteira |
 | Altitude, declividade, forma de relevo | Geosphere.Terrain | Atmosphere, SurfaceWater, Botany | campo e eventos raros |
 | Rochas e substrato geológico | Geosphere.Geology | Soil, Geomorphology | campos/receitas |

@@ -1,0 +1,40 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Biosphere.Zoology.Genetics",
+  "roadmapPhase": "Z5",
+  "gateStatus": "in-progress",
+  "scope": "versioned genotype persistence on N3 agents, deterministic founders, one-parent mutation and save migration through an optional Zoology genetics capability",
+  "ownedProcesses": [
+    "generate a founder genome from world seed and persistent animal identity",
+    "validate and preserve an existing species-bound genome on load",
+    "inherit a single N3 parent's genome with bounded deterministic Z1 mutation when the current reproduction rule creates an offspring",
+    "record parent genome identity and migrate legacy saves to the current schema"
+  ],
+  "ownedPersistentFields": [
+    "AnimalAgentV1.Genome"
+  ],
+  "providesCapabilities": [
+    "IZoologyGeneticsV1"
+  ],
+  "coreMediatedInputs": [
+    "world seed and persistent animal identity",
+    "N3 reproduction day and next animal identity",
+    "versioned save payload"
+  ],
+  "scopeLimitations": [
+    "one-parent inheritance follows the current N3 prototype and does not claim vertebrate sexual reproduction",
+    "ParentBId, sex, recombination, mate choice and reproductive compatibility are not implemented",
+    "herbivore and predator profiles both map to the generic Z1 quadruped prototype",
+    "genetic traits do not yet affect N3 development, metabolism, movement, survival or reproduction rates",
+    "gene bounds and the mutation operator are engineering prototypes, not population-calibrated values",
+    "no gene-linked selection, multi-generation population analysis or speciation claim"
+  ],
+  "validationPending": [
+    "obtain an authorized Dryad bearer token or equivalent public mirror, then validate README schemas and cross-file individual keys before extracting and versioning a St Kilda Soay reference-data package; anonymous metadata and the full-text article are accessible, but file downloads returned 401",
+    "select a compatible predator reference population and determine whether the fish target is resident freshwater or anadromous Chinook",
+    "calibrate trait inheritance, developmental plasticity and reproductive biology separately for each declared population",
+    "decide species-specific sexual/asexual mode, compatibility and recombination rules before claiming realistic vertebrate inheritance",
+    "verify deterministic per-genome visual derivation and prove simulation invariance with rendering toggled",
+    "test population-level drift, selection and extinction across generations without forcing convergence"
+  ]
+}

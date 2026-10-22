@@ -163,24 +163,24 @@ public sealed class ProceduralTreeStructureTests
     [Fact]
     public void Primary_bough_lengths_follow_the_species_crown_envelope()
     {
-        var sphericalLow = new List<float>();
-        var sphericalMiddle = new List<float>();
-        var sphericalHigh = new List<float>();
+        var hemisphericalLow = new List<float>();
+        var hemisphericalMiddle = new List<float>();
+        var hemisphericalHigh = new List<float>();
         var conicalLow = new List<float>();
         var conicalHigh = new List<float>();
 
         for (ulong seed = 1; seed <= 40; seed++)
         {
             CollectPrimaryBoughs(ProceduralTreeGenerator.Generate(0, 8f, 1f, seed, detailLevel: 2),
-                sphericalLow, sphericalMiddle, sphericalHigh);
+                hemisphericalLow, hemisphericalMiddle, hemisphericalHigh);
             CollectPrimaryBoughs(ProceduralTreeGenerator.Generate(1, 8f, 1f, seed, detailLevel: 2),
                 conicalLow, null, conicalHigh);
         }
 
-        Assert.True(sphericalLow.Count > 20 && sphericalMiddle.Count > 20 && sphericalHigh.Count > 20);
+        Assert.True(hemisphericalLow.Count > 20 && hemisphericalMiddle.Count > 20 && hemisphericalHigh.Count > 20);
         Assert.True(conicalLow.Count > 20 && conicalHigh.Count > 20);
-        Assert.True(Average(sphericalMiddle) > Average(sphericalLow) * 1.35f);
-        Assert.True(Average(sphericalMiddle) > Average(sphericalHigh) * 1.35f);
+        Assert.True(Average(hemisphericalLow) > Average(hemisphericalMiddle) * 1.15f);
+        Assert.True(Average(hemisphericalMiddle) > Average(hemisphericalHigh) * 1.35f);
         Assert.True(Average(conicalLow) > Average(conicalHigh) * 1.45f);
     }
 
@@ -213,6 +213,23 @@ public sealed class ProceduralTreeStructureTests
         Assert.True(birch.TerminalLengthRatio < willow.TerminalLengthRatio);
         Assert.True(birch.GravitySagRatio < willow.GravitySagRatio);
         Assert.True(birch.SecondaryDivergenceDegrees < willow.SecondaryDivergenceDegrees);
+    }
+
+    [Fact]
+    public void Exposed_root_expression_is_specific_to_biological_tree_profile()
+    {
+        var oak = ProceduralTreeGenerator.Generate(0, 8f, 1f, 101UL, detailLevel: 2).RootTraits;
+        var pine = ProceduralTreeGenerator.Generate(1, 8f, 1f, 101UL, detailLevel: 2).RootTraits;
+        var birch = ProceduralTreeGenerator.Generate(2, 8f, 1f, 101UL, detailLevel: 2).RootTraits;
+        var maple = ProceduralTreeGenerator.Generate(3, 8f, 1f, 101UL, detailLevel: 2).RootTraits;
+        var willow = ProceduralTreeGenerator.Generate(4, 8f, 1f, 101UL, detailLevel: 2).RootTraits;
+
+        Assert.True(oak.SurfaceRootExpressionPotential > maple.SurfaceRootExpressionPotential);
+        Assert.True(maple.SurfaceRootExpressionPotential > willow.SurfaceRootExpressionPotential);
+        Assert.Equal(0f, pine.SurfaceRootExpressionPotential);
+        Assert.Equal(0f, birch.SurfaceRootExpressionPotential);
+        Assert.True(oak.SurfaceRootCount != maple.SurfaceRootCount);
+        Assert.True(oak.LateralSpreadRatio != willow.LateralSpreadRatio);
     }
 
     [Fact]

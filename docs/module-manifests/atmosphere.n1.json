@@ -1,0 +1,23 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Atmosphere",
+  "roadmapPhase": "N1",
+  "gateStatus": "validated",
+  "scope": "L0 weather forcing and air temperature",
+  "ownedProcesses": [
+    "hourly cloud and precipitation forecast",
+    "seasonal and hourly air temperature"
+  ],
+  "ownedPersistentFields": [
+    "ClimateSample.AirTemperatureC",
+    "ClimateSample.RelativeHumidityProxy",
+    "ClimateSample.PrecipitationLastHourMm",
+    "ClimateSample.CloudCoverFraction"
+  ],
+  "providesCapabilities": [
+    "IClimateForcingV1",
+    "IAtmosphericTemperatureV1"
+  ],
+  "coreMediatedInputs": [],
+  "validationPending": []
+}

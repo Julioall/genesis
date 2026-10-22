@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Geosphere",
+  "roadmapPhase": "N1",
+  "gateStatus": "validated",
+  "scope": "L0 terrain and soil water",
+  "ownedProcesses": [
+    "terrain elevation, gradients, and topographic solar factor",
+    "soil hydraulic profiles, infiltration capacity, soil evaporation, and transpiration confirmation",
+    "confirmation of Biosphere proposals for mineral nitrogen and soil organic matter"
+  ],
+  "ownedPersistentFields": [
+    "ElevationM",
+    "SoilKind",
+    "SoilWaterMm",
+    "MineralNitrogenGPerM2",
+    "SoilOrganicMatterGPerM2",
+    "SoilOrganicNitrogenGPerM2"
+  ],
+  "providesCapabilities": [
+    "IGeosphereTerrainV1",
+    "ISoilWaterV1",
+    "ISoilBiogeochemistryV1"
+  ],
+  "coreMediatedInputs": [],
+  "validationPending": []
+}

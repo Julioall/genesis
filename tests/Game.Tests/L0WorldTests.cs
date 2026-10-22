@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Game.Contracts;
 using Game.Client.Desktop;
 using Game.Core;
+using Game.Modules.Atmosphere;
 using Game.Modules.Biosphere;
 using Game.Modules.Cosmos;
 using Game.Modules.Geosphere;
@@ -28,13 +31,13 @@ public sealed class L0WorldTests
     [Fact]
     public void Same_seed_and_tick_partitions_produce_the_same_state()
     {
-        var first = WorldSimulation.Create(1);
-        var second = WorldSimulation.Create(1);
+        var first = TestWorldFactory.Create(1);
+        var second = TestWorldFactory.Create(1);
         first.AdvanceTicks(60);
         second.AdvanceTicks(20);
         second.AdvanceTicks(40);
         Assert.Equal(first.CanonicalHash(), second.CanonicalHash());
-        Assert.NotEqual(first.CanonicalHash(), WorldSimulation.Create(2).CanonicalHash());
+        Assert.NotEqual(first.CanonicalHash(), TestWorldFactory.Create(2).CanonicalHash());
     }
 
     [Fact]
@@ -67,6 +70,7 @@ public sealed class L0WorldTests
                     Math.Abs(current - first[(y + 1) * SimulationState.Width + x]));
         }
         Assert.True(steepestCardinalDrop >= 16);
+
     }
 
     [Fact]
@@ -185,24 +189,25 @@ public sealed class L0WorldTests
     [Fact]
     public void Snapshot_altitudes_and_D8_receivers_follow_the_physical_terrain_field()
     {
-        var world = WorldSimulation.Create(1).Snapshot();
+        var world = TestWorldFactory.Create(1).Snapshot();
         var elevations = TerrainModel.GenerateElevationField(world.Seed);
         var cells = world.Cells.ToArray();
         for (var index = 0; index < cells.Length; index++)
             Assert.Equal(elevations[index], cells[index].ElevationM, 8);
 
-        var drainage = SurfaceWaterModel.AnalyzeDrainage(cells);
+        var waterCells = TestWorldFactory.ToSurfaceWaterCells(cells);
+        var drainage = SurfaceWaterModel.AnalyzeDrainage(waterCells);
         var drawableCascadeEdges = 0;
         for (var from = 0; from < drainage.Receiver.Length; from++)
         {
             var to = drainage.Receiver[from];
             if (to < 0) continue;
-            Assert.True(cells[to].ElevationM < cells[from].ElevationM,
+            Assert.True(waterCells[to].ElevationM < waterCells[from].ElevationM,
                 $"D8 receiver {to} must be lower than source cell {from}.");
             if (drainage.Accumulation[from] >= SurfaceWaterModel.ChannelThresholdCells
-                && (cells[from].SurfaceWaterMm >= 20 || cells[to].SurfaceWaterMm >= 20)
-                && !(cells[from].SurfaceWaterMm >= 250 && cells[to].SurfaceWaterMm >= 250)
-                && cells[from].ElevationM - cells[to].ElevationM >= 6)
+                && (waterCells[from].SurfaceWaterMm >= 20 || waterCells[to].SurfaceWaterMm >= 20)
+                && !(waterCells[from].SurfaceWaterMm >= 250 && waterCells[to].SurfaceWaterMm >= 250)
+                && waterCells[from].ElevationM - waterCells[to].ElevationM >= 6)
                 drawableCascadeEdges++;
         }
         Assert.True(drawableCascadeEdges > 0, "The canonical seed should route water over at least one real elevation break.");
@@ -211,7 +216,7 @@ public sealed class L0WorldTests
     [Fact]
     public void Priority_flood_preserves_the_bed_and_measures_level_pool_volume_and_area()
     {
-        var terrain = WorldSimulation.Create(1).Snapshot().Cells
+        var terrain = TestWorldFactory.ToSurfaceWaterCells(TestWorldFactory.Create(1).Snapshot().Cells)
             .Select(cell => cell with { ElevationM = 0, SurfaceWaterMm = 0, GroundwaterMm = 0 })
             .ToArray();
         for (var y = 30; y <= 34; y++)
@@ -239,7 +244,7 @@ public sealed class L0WorldTests
     [Fact]
     public void Priority_flood_receiver_tree_is_deterministic_and_routes_all_cells_to_the_open_edge()
     {
-        var terrain = WorldSimulation.Create(2).Snapshot().Cells.ToArray();
+        var terrain = TestWorldFactory.ToSurfaceWaterCells(TestWorldFactory.Create(2).Snapshot().Cells);
         var first = SurfaceWaterModel.AnalyzeHydrology(terrain);
         var second = SurfaceWaterModel.AnalyzeHydrology(terrain);
 
@@ -299,7 +304,7 @@ public sealed class L0WorldTests
     [Fact]
     public void Initial_vegetation_keeps_altitude_fractions_and_forms_spatial_patches()
     {
-        var cells = WorldSimulation.Create(1).Snapshot().Cells.ToArray();
+        var cells = TestWorldFactory.Create(1).Snapshot().Cells.ToArray();
         var elevations = cells.Select(cell => cell.ElevationM).ToArray();
         var grassFractions = new[] { 0.55, 0.38, 0.12 };
         var woodyFractions = new[] { 0.30, 0.62, 0.40 };
@@ -362,8 +367,8 @@ public sealed class L0WorldTests
     [Fact]
     public void Initial_surface_water_follows_drainage_and_includes_lake_storage()
     {
-        var cells = WorldSimulation.Create(1).Snapshot().Cells;
-        var repeated = WorldSimulation.Create(1).Snapshot().Cells;
+        var cells = TestWorldFactory.Create(1).Snapshot().Cells;
+        var repeated = TestWorldFactory.Create(1).Snapshot().Cells;
         var wetCells = cells.Where(cell => cell.SurfaceWaterMm > 0).ToArray();
         Assert.True(wetCells.Length >= 12);
         Assert.True(wetCells.Sum(cell => cell.SurfaceWaterMm) > 0);
@@ -376,7 +381,7 @@ public sealed class L0WorldTests
     [Fact]
     public void Tick_zero_is_a_real_initial_state_and_render_snapshot_is_read_only()
     {
-        var world = WorldSimulation.Create(1);
+        var world = TestWorldFactory.Create(1);
         var before = world.Snapshot();
         world.AdvanceTicks(5);
         var after = world.Snapshot();
@@ -389,38 +394,210 @@ public sealed class L0WorldTests
     [Fact]
     public void Solar_geometry_has_zero_night_and_positive_midday_radiation()
     {
-        Assert.Equal(0, SolarGeometry.At(1, 0).TopOfAtmosphereWPerM2);
-        Assert.True(SolarGeometry.At(172, 12).TopOfAtmosphereWPerM2 > 0);
+        var night = SolarGeometry.At(1, 0);
+        var noon = SolarGeometry.At(172, 12);
+        var summerSolsticeAtEquator = SolarGeometry.At(172, 12, 0);
+        var midnightSunAtNorthPole = SolarGeometry.At(172, 0, 90);
+        var polarWinter = SolarGeometry.At(355, 12, 90);
+        Assert.Equal(0, night.TopOfAtmosphereIrradianceWPerM2);
+        Assert.True(noon.TopOfAtmosphereIrradianceWPerM2 > 0);
+        Assert.Equal(Math.Cos(23.44 * Math.PI / 180), summerSolsticeAtEquator.UpDirection, 3);
+        Assert.True(midnightSunAtNorthPole.TopOfAtmosphereIrradianceWPerM2 > 0);
+        Assert.Equal(Math.Sin(23.44 * Math.PI / 180), midnightSunAtNorthPole.UpDirection, 3);
+        Assert.Equal(0, polarWinter.TopOfAtmosphereIrradianceWPerM2);
+        Assert.Equal(172, noon.DayOfYear);
+        Assert.Equal(12, noon.SolarHour);
+        Assert.Equal(45, noon.LatitudeDegrees);
+        Assert.Equal(1, Math.Sqrt(noon.EastDirection * noon.EastDirection
+            + noon.NorthDirection * noon.NorthDirection + noon.UpDirection * noon.UpDirection), 10);
         Assert.Equal(0.0, BotanyModel.TemperatureSuitability(-2, -2, 20, 38));
+    }
+
+    [Fact]
+    public void Seasonal_and_daily_temperature_are_owned_by_atmosphere()
+    {
+        var seaLevel = TemperatureModel.SeasonalMeanTemperatureC(200, 0);
+        var highland = TemperatureModel.SeasonalMeanTemperatureC(200, 1_000);
+
+        Assert.Equal(23, seaLevel, 10);
+        Assert.Equal(16.5, highland, 10);
+        Assert.Equal(seaLevel + 5, TemperatureModel.AirTemperatureC(200, 15, 0), 10);
+        Assert.Equal(seaLevel - 5, TemperatureModel.AirTemperatureC(200, 3, 0), 10);
+        Assert.Throws<ArgumentOutOfRangeException>(() => TemperatureModel.AirTemperatureC(200, double.PositiveInfinity, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TemperatureModel.SeasonalMeanTemperatureC(366, 0));
+    }
+
+    [Fact]
+    public void Atmosphere_forecast_publishes_a_repeatable_read_only_hourly_tile_field()
+    {
+        var atmosphere = new AtmosphereModuleV1();
+        var rainAge = Enumerable.Repeat(24, 16).ToArray();
+        var forecast = atmosphere.ForecastDay(1, 20, 48, rainAge);
+        var repeated = atmosphere.ForecastDay(1, 20, 48, rainAge);
+
+        Assert.Equal(24 * 16, forecast.Count);
+        Assert.Equal(forecast, repeated);
+        Assert.All(forecast, hour =>
+        {
+            Assert.True(double.IsFinite(hour.PrecipitationMm));
+            Assert.InRange(hour.PrecipitationMm, 0, 12);
+            Assert.InRange(hour.CloudCover, 0, 0.85);
+        });
+        Assert.All(rainAge, age => Assert.Equal(24, age));
+        Assert.Throws<NotSupportedException>(() => ((IList<ClimateHour>)forecast)[0] = default);
+    }
+
+    [Fact]
+    public void Solar_geometry_rejects_inputs_outside_its_contract()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => SolarGeometry.At(0, 12));
+        Assert.Throws<ArgumentOutOfRangeException>(() => SolarGeometry.At(1, double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => SolarGeometry.At(1, 12, 91));
+    }
+
+    [Fact]
+    public void Hourly_air_temperature_is_daily_mean_plus_diurnal_offset()
+    {
+        var atmosphere = new AtmosphereModuleV1();
+        for (var day = 1; day <= 365; day += 47)
+        for (var hour = 0.5; hour < 24; hour += 5.5)
+        {
+            var dailyMean = atmosphere.SeasonalMeanTemperatureC(day, 137.25);
+            var diurnalOffset = atmosphere.DiurnalTemperatureOffsetC(hour);
+            Assert.Equal(atmosphere.AirTemperatureC(day, hour, 137.25), dailyMean + diurnalOffset);
+        }
+    }
+
+    [Fact]
+    public void Terrain_solar_factor_batch_matches_cell_scoped_calculation()
+    {
+        var geosphere = new GeosphereModuleV1();
+        var elevations = geosphere.GenerateElevationField(7);
+        var normals = geosphere.CreateTerrainSolarNormals(elevations);
+        var factors = geosphere.TerrainSolarFactors(normals, 0.31, -0.42, 0.71);
+
+        Assert.Equal(elevations.Length, normals.Length);
+        Assert.Equal(elevations.Length, factors.Length);
+        for (var index = 0; index < elevations.Length; index++)
+            Assert.Equal(geosphere.TerrainSolarFactor(elevations, index % SimulationState.Width,
+                index / SimulationState.Width, 0.31, -0.42, 0.71), factors[index], 14);
+    }
+
+    [Fact]
+    public void Core_consumes_substitutable_domain_capabilities()
+    {
+        var solar = new CountingSolarForcing(new CosmosModuleV1());
+        var atmosphere = new AtmosphereModuleV1();
+        var geosphere = new CountingGeosphere(new GeosphereModuleV1());
+        var hydrosphere = new CountingHydrosphere(new HydrosphereModuleV1());
+        var biosphere = new CountingBiosphere(new BiosphereModuleV1());
+        var world = WorldSimulation.Create(1, solar, atmosphere, atmosphere, geosphere, geosphere,
+            geosphere, hydrosphere, biosphere, biosphere, biosphere);
+        var callsAfterInitialization = solar.CallCount;
+
+        Assert.True(geosphere.ElevationFieldCallCount > 0);
+        Assert.Equal(1, geosphere.SolarNormalFieldCallCount);
+        Assert.True(geosphere.SoilProfileCallCount > 0);
+        Assert.True(hydrosphere.SeedCallCount > 0);
+        Assert.Equal(1, hydrosphere.RoutingPlanCallCount);
+        Assert.True(biosphere.InitialPatchCallCount > 0);
+        world.AdvanceTicks((int)SimulationState.TicksPerHour);
+
+        Assert.True(callsAfterInitialization > 0);
+        Assert.True(solar.CallCount > callsAfterInitialization);
+        Assert.Equal(24, geosphere.SolarFactorFieldCallCount);
+        Assert.True(geosphere.SoilWaterCallCount > 0);
+        Assert.True(hydrosphere.PrecipitationCallCount > 0);
+        Assert.True(hydrosphere.RouteCallCount > 0);
+        Assert.True(biosphere.GrowthCallCount > 0);
+        Assert.Equal(0, biosphere.SeedDispersalCallCount);
+        Assert.True(geosphere.PlantTranspirationCallCount > 0);
+        Assert.True(geosphere.MineralNitrogenConfirmationCallCount > 0);
+
+        world.AdvanceTicks((int)(SimulationState.TicksPerDay - SimulationState.TicksPerHour));
+        Assert.True(geosphere.EcologyProposalConfirmationCallCount > 0);
     }
 
     [Fact]
     public void Saturated_soil_routes_rain_to_surface_storage()
     {
-        var cell = WorldSimulation.Create(1).Snapshot().Cells[0] with
-        {
-            SoilWaterMm = 100,
-            SoilCapacityMm = 100,
-            SoilWiltMm = 20,
-            SoilKsatMmPerHour = 20,
-            SurfaceWaterMm = 0,
-            Grass = default,
-            Woody = default
-        };
-        var result = SoilModel.ReceiveRainAndEvaporate(cell, 12, 0, 0);
+        var soilModule = new GeosphereModuleV1();
+        var hydroModule = new HydrosphereModuleV1();
+        var soil = new SoilHydraulicStateV1(100, 100, 20, 20);
+        var infiltrationCapacity = soilModule.MaximumInfiltrationMm(soil);
+        var surface = hydroModule.ReceivePrecipitation(new SurfaceWaterStateV1(0, 0, 0), 12,
+            0, infiltrationCapacity, 0);
+        var result = soilModule.ApplyInfiltrationAndEvaporate(soil, surface.InfiltrationMm,
+            0, 0, surface.PlantWaterDemandMultiplier);
+
         Assert.Equal(100, result.SoilWaterMm);
-        Assert.Equal(12, result.SurfaceWaterMm);
-        Assert.Equal(0, result.InterceptionMm);
+        Assert.Equal(12, surface.SurfaceWaterMm);
+        Assert.Equal(0, surface.InfiltrationMm);
+        Assert.Equal(0, surface.InterceptionMm);
+    }
+
+    [Fact]
+    public void Existing_puddle_infiltrates_without_new_rain()
+    {
+        var soilModule = new GeosphereModuleV1();
+        var hydroModule = new HydrosphereModuleV1();
+        var soil = new SoilHydraulicStateV1(70, 100, 20, 20);
+        var water = new SurfaceWaterStateV1(0, 2, 0);
+        var infiltrationCapacity = soilModule.MaximumInfiltrationMm(soil);
+
+        var surface = hydroModule.ReceivePrecipitation(water, 0, 0, infiltrationCapacity, 0);
+        var soilResult = soilModule.ApplyInfiltrationAndEvaporate(soil, surface.InfiltrationMm,
+            0, 0, surface.PlantWaterDemandMultiplier);
+
+        Assert.Equal(2, surface.InfiltrationMm);
+        Assert.Equal(0, surface.SurfaceWaterMm);
+        Assert.Equal(72, soilResult.SoilWaterMm);
+        var storageChangeLiters = soilResult.SoilWaterMm * SimulationState.CellAreaM2
+            + surface.SurfaceWaterMm * SimulationState.CellAreaM2
+            - (soil.SoilWaterMm + water.SurfaceWaterMm) * SimulationState.CellAreaM2;
+        Assert.InRange(Math.Abs(storageChangeLiters), 0, 1e-12);
+    }
+
+    [Fact]
+    public void Geosphere_hydrosphere_hourly_exchange_closes_the_local_water_budget()
+    {
+        var soilModule = new GeosphereModuleV1();
+        var hydroModule = new HydrosphereModuleV1();
+        var soil = new SoilHydraulicStateV1(72, 100, 20, 18);
+        var surface = new SurfaceWaterStateV1(7, 5, 17);
+        const double precipitationMm = 12;
+        const double plantCover = 0.4;
+        const double potentialEtMm = 1.5;
+
+        var infiltrationCapacity = soilModule.MaximumInfiltrationMm(soil);
+        var surfaceResult = hydroModule.ReceivePrecipitation(surface, precipitationMm, plantCover,
+            infiltrationCapacity, potentialEtMm);
+        var soilResult = soilModule.ApplyInfiltrationAndEvaporate(soil, surfaceResult.InfiltrationMm,
+            plantCover, potentialEtMm, surfaceResult.PlantWaterDemandMultiplier);
+
+        var initialStorageMm = soil.SoilWaterMm + surface.SurfaceWaterMm;
+        var finalStorageMm = soilResult.SoilWaterMm + surfaceResult.SurfaceWaterMm;
+        var expectedFinalMm = initialStorageMm + precipitationMm - surfaceResult.InterceptionMm
+            - surfaceResult.OpenWaterEvaporationMm - soilResult.SoilEvaporationMm;
+
+        Assert.InRange(Math.Abs(finalStorageMm - expectedFinalMm), 0, 1e-12);
+        Assert.InRange(surfaceResult.InfiltrationMm, 0, infiltrationCapacity);
+        Assert.InRange(surfaceResult.SurfaceWaterMm, 0, double.MaxValue);
+        Assert.InRange(soilResult.SoilWaterMm, soil.WiltMm, soil.CapacityMm);
     }
 
     [Fact]
     public void Surface_water_routing_conserves_internal_flow_and_accounts_boundary_loss()
     {
-        var cells = WorldSimulation.Create(1).Snapshot().Cells.ToArray();
+        var cells = TestWorldFactory.ToSurfaceWaterCells(TestWorldFactory.Create(1).Snapshot().Cells);
         var centerIndex = (SimulationState.Height / 2) * SimulationState.Width + SimulationState.Width / 2;
         cells[centerIndex] = cells[centerIndex] with { SurfaceWaterMm = 100 };
         var beforeLiters = cells.Sum(c => (c.SurfaceWaterMm + c.GroundwaterMm) * SimulationState.CellAreaM2);
+        var routingPlan = SurfaceWaterModel.CreateRoutingPlan(cells);
+        var cachedRoute = SurfaceWaterModel.Route(cells, routingPlan);
         var routed = SurfaceWaterModel.Route(cells);
+        Assert.Equal(routed.OutflowLiters, cachedRoute.OutflowLiters, 10);
+        Assert.Equal(routed.Cells, cachedRoute.Cells);
         var afterLiters = routed.Cells.Sum(c => (c.SurfaceWaterMm + c.GroundwaterMm) * SimulationState.CellAreaM2);
         var roundoffToleranceLiters = Math.Max(1e-3, beforeLiters * 1e-9);
         Assert.InRange(Math.Abs(beforeLiters - afterLiters - routed.OutflowLiters), 0, roundoffToleranceLiters);
@@ -428,28 +605,126 @@ public sealed class L0WorldTests
     }
 
     [Fact]
+    public void Edge_routing_conserves_internal_transfer_and_reports_boundary_outflow()
+    {
+        var cells = Enumerable.Range(0, SimulationState.Width * SimulationState.Height)
+            .Select(index => new SurfaceWaterCellV1(index, index % SimulationState.Width,
+                index / SimulationState.Width, 0, 0, 0)).ToArray();
+        var edgeIndex = (SimulationState.Height / 2) * SimulationState.Width;
+        cells[edgeIndex] = cells[edgeIndex] with { SurfaceWaterMm = 100 };
+        var beforeLiters = cells.Sum(cell => cell.SurfaceWaterMm * SimulationState.CellAreaM2);
+
+        var routed = SurfaceWaterModel.Route(cells);
+        var afterLiters = routed.Cells.Sum(cell => cell.SurfaceWaterMm * SimulationState.CellAreaM2);
+
+        Assert.True(routed.OutflowLiters > 0);
+        Assert.InRange(Math.Abs(beforeLiters - afterLiters - routed.OutflowLiters), 0, 1e-10);
+        Assert.True(routed.Cells[edgeIndex].SurfaceWaterMm < 100);
+        Assert.Contains(routed.Cells, cell => cell.SurfaceWaterMm > 0);
+    }
+
+    [Fact]
     public void Growth_responds_to_light_water_and_mineral_nitrogen()
     {
-        var source = WorldSimulation.Create(1).Snapshot().Cells[31 * 64 + 31] with
-        {
-            Grass = new PlantPatch(true, 100, 1.8, 0, 0, 0, 0),
-            Woody = default,
-            MineralNitrogenGPerM2 = 4
-        };
-        var sun = BotanyModel.GrowHour(source, 20, 8, 1, 20, 1, 1);
-        var night = BotanyModel.GrowHour(source, 20, 0, 1, 20, 1, 1);
-        var dry = BotanyModel.GrowHour(source, 20, 8, 1, 0, 0, 1);
-        var nitrogenFree = BotanyModel.GrowHour(source with { MineralNitrogenGPerM2 = 0 }, 20, 8, 1, 20, 1, 1);
+        var state = new BotanyCellStateV1(
+            new PlantPatchPair(new PlantPatch(true, 100, 1.8, 0, 0, 0, 0), default), default);
+        var sun = BotanyModel.GrowHour(Input(state, 4, 20, 8, 20));
+        var night = BotanyModel.GrowHour(Input(state, 4, 20, 0, 20));
+        var dry = BotanyModel.GrowHour(Input(state, 4, 20, 8, 0));
+        var nitrogenFree = BotanyModel.GrowHour(Input(state, 0, 20, 8, 20));
         Assert.True(sun.NewBiomassGPerM2 > 0);
         Assert.Equal(0, night.NewBiomassGPerM2);
         Assert.Equal(0, dry.NewBiomassGPerM2);
         Assert.Equal(0, nitrogenFree.NewBiomassGPerM2);
+        Assert.InRange(sun.MineralNitrogenAfterGrowthProposalGPerM2, 0, 4);
+        Assert.Equal(0, nitrogenFree.MineralNitrogenAfterGrowthProposalGPerM2);
+
+        var fullSun = BotanyModel.GrowHour(Input(state, 100, 20, 8, 20));
+        var halfSun = BotanyModel.GrowHour(Input(state, 100, 20, 4, 20));
+        Assert.True(fullSun.NewBiomassGPerM2 > 0);
+        Assert.Equal(fullSun.NewBiomassGPerM2 * 0.5, halfSun.NewBiomassGPerM2, 12);
+        Assert.Equal(fullSun, BotanyModel.GrowHour(Input(state, 100, 20, 8, 20),
+            BotanyModel.CoverComponents(state.Plants)));
+
+        static BotanyHourInputV1 Input(BotanyCellStateV1 state, double nitrogen, double temperature,
+            double shortwave, double availableWater)
+            => new(state, nitrogen, temperature, shortwave, 1, availableWater, 1, 1);
+    }
+
+    [Fact]
+    public void Seed_dispersal_skips_empty_hours_and_conserves_produced_matter_and_nitrogen()
+    {
+        var states = new BotanyCellStateV1[SimulationState.Width * SimulationState.Height];
+        var origin = SimulationState.Width * 10 + 10;
+        var grass = new PlantPatch(true, 100, 1.8, 10, 0.18, 0, 0);
+        states[origin] = new(new PlantPatchPair(grass, default), default);
+        var noSeeds = new BotanyHourResultV1[states.Length];
+        Assert.Same(states, BotanyModel.DisperseSeeds(states, noSeeds));
+
+        var production = new BotanyHourResultV1[states.Length];
+        production[origin] = new(states[origin], 0, 0, 0, 10, 0);
+        var dispersed = BotanyModel.DisperseSeeds(states, production);
+        var dryMatter = dispersed.Sum(state => state.Plants.Grass.SeedBankGPerM2);
+        var nitrogen = dispersed.Sum(state => state.Plants.Grass.SeedBankNitrogenGPerM2);
+
+        Assert.Equal(8, dispersed[origin].Plants.Grass.SeedBankGPerM2, 12);
+        Assert.Equal(10, dryMatter, 12);
+        Assert.Equal(0.18, nitrogen, 12);
+        Assert.True(dispersed[origin + 1].Plants.Grass.Present);
+    }
+
+    [Fact]
+    public void Drought_from_saturated_soil_limits_both_plants_without_crossing_wilt()
+    {
+        var geosphere = new GeosphereModuleV1();
+        var hydrosphere = new HydrosphereModuleV1();
+        var biosphere = new BiosphereModuleV1();
+        var soil = new SoilHydraulicStateV1(100, 100, 20, 20);
+        var surface = new SurfaceWaterStateV1(0, 0, 0);
+        var botany = new BotanyCellStateV1(new PlantPatchPair(
+            new PlantPatch(true, 100, 1.8, 0, 0, 0, 0),
+            new PlantPatch(true, 250, 3.0, 0, 0, 0, 0)), default);
+        var mineralNitrogen = 1_000.0;
+        var totalTranspirationMm = 0.0;
+
+        for (var hour = 0; hour < 48; hour++)
+        {
+            var soilState = soil;
+            var cover = biosphere.TotalCover(botany.Plants);
+            var infiltrationCapacity = geosphere.MaximumInfiltrationMm(soilState);
+            var surfaceExchange = hydrosphere.ReceivePrecipitation(surface, 0, cover,
+                infiltrationCapacity, 0);
+            var soilWater = geosphere.ApplyInfiltrationAndEvaporate(soilState,
+                surfaceExchange.InfiltrationMm, cover, 0, surfaceExchange.PlantWaterDemandMultiplier);
+            var growth = biosphere.GrowHour(new BotanyHourInputV1(botany, mineralNitrogen,
+                20, 8, 5, soilWater.PlantAvailableWaterMm, soilWater.WaterFactorAvailable,
+                surfaceExchange.PlantWaterDemandMultiplier));
+            var transpiration = geosphere.ApplyPlantTranspiration(new SoilHydraulicStateV1(
+                soilWater.SoilWaterMm, soil.CapacityMm, soil.WiltMm, soil.KsatMmPerHour),
+                growth.TranspirationMm);
+            mineralNitrogen = geosphere.ConfirmMineralNitrogenAfterGrowth(mineralNitrogen,
+                growth.MineralNitrogenAfterGrowthProposalGPerM2);
+            soil = soil with { SoilWaterMm = transpiration.SoilWaterMm };
+            botany = growth.State;
+            totalTranspirationMm += transpiration.ConfirmedTranspirationMm;
+
+            Assert.Equal(0, surfaceExchange.InfiltrationMm);
+            Assert.InRange(transpiration.ConfirmedTranspirationMm, 0,
+                soilWater.PlantAvailableWaterMm);
+            Assert.InRange(soil.SoilWaterMm, soil.WiltMm, soil.CapacityMm);
+        }
+
+        Assert.True(totalTranspirationMm > 0);
+        Assert.Equal(soil.WiltMm, soil.SoilWaterMm, 10);
+        Assert.InRange(mineralNitrogen, 0, 1_000);
+        Assert.Equal(0, biosphere.GrowHour(new BotanyHourInputV1(botany, mineralNitrogen,
+            20, 8, 5, 0, 0, 1)).TranspirationMm);
     }
 
     [Fact]
     public void Daily_litter_decomposition_conserves_dry_matter_and_nitrogen()
     {
-        var cell = WorldSimulation.Create(1).Snapshot().Cells[31 * 64 + 31] with
+        var cell = TestWorldFactory.Create(1).Snapshot().Cells[31 * 64 + 31] with
         {
             DetritusDryGPerM2 = 120,
             DetritusNitrogenGPerM2 = 1.2,
@@ -459,30 +734,91 @@ public sealed class L0WorldTests
         };
         var matterBefore = cell.DetritusDryGPerM2 + cell.SoilOrganicMatterGPerM2;
         var nitrogenBefore = cell.DetritusNitrogenGPerM2 + cell.SoilOrganicNitrogenGPerM2 + cell.MineralNitrogenGPerM2;
-        var result = EcologyModel.CloseDay(cell, 20);
-        var matterAfter = result.Cell.DetritusDryGPerM2 + result.Cell.SoilOrganicMatterGPerM2
+        var result = EcologyModel.CloseDay(TestWorldFactory.ToEcologyInput(cell, 20));
+        var matterAfter = result.DetritusDryGPerM2 + result.SoilProposal.SoilOrganicMatterGPerM2
             + result.DetritusRespirationGPerM2 + result.SoilOrganicMatterRespirationGPerM2;
-        var nitrogenAfter = result.Cell.DetritusNitrogenGPerM2 + result.Cell.SoilOrganicNitrogenGPerM2 + result.Cell.MineralNitrogenGPerM2;
+        var nitrogenAfter = result.DetritusNitrogenGPerM2 + result.SoilProposal.SoilOrganicNitrogenGPerM2
+            + result.SoilProposal.MineralNitrogenGPerM2;
         Assert.InRange(Math.Abs(matterBefore - matterAfter), 0, 1e-10);
         Assert.InRange(Math.Abs(nitrogenBefore - nitrogenAfter), 0, 1e-10);
+
+        var dryResult = EcologyModel.CloseDay(TestWorldFactory.ToEcologyInput(
+            cell with { SoilWaterMm = cell.SoilWiltMm }, 20));
+        var coldResult = EcologyModel.CloseDay(TestWorldFactory.ToEcologyInput(cell, 0));
+        Assert.True(result.DetritusDryGPerM2 < dryResult.DetritusDryGPerM2);
+        Assert.True(result.DetritusRespirationGPerM2 > dryResult.DetritusRespirationGPerM2);
+        Assert.True(result.DetritusRespirationGPerM2 > coldResult.DetritusRespirationGPerM2);
     }
 
     [Fact]
-    public void Save_load_preserves_midday_weather_scheduler_and_continuation()
+    public void Ecology_returns_more_plant_material_from_a_stressed_habitat()
     {
-        var uninterrupted = WorldSimulation.Create(1);
+        var grass = new PlantPatch(true, 100, 1.8, 0, 0, 0, 0);
+        var favorable = new BotanyCellStateV1(new PlantPatchPair(grass, default),
+            new BotanyDailyFactorsV1(24, 24, 24, 0, 0, 0, 0, 0));
+        var stressed = new BotanyCellStateV1(new PlantPatchPair(grass, default),
+            new BotanyDailyFactorsV1(0, 0, 0, 24, 0, 0, 0, 0));
+        var soilMoisture = new SoilMoistureContextV1(90, 180, 35);
+        var soil = new SoilBiogeochemistryStateV1(1500, 22.5, 4);
+
+        var favorableResult = EcologyModel.CloseDay(new EcologyDailyInputV1(
+            favorable, 0, 0, soilMoisture, soil, 20));
+        var stressedResult = EcologyModel.CloseDay(new EcologyDailyInputV1(
+            stressed, 0, 0, soilMoisture, soil, 20));
+
+        Assert.True(stressedResult.Botany.Plants.Grass.BiomassGPerM2
+            < favorableResult.Botany.Plants.Grass.BiomassGPerM2);
+        Assert.True(stressedResult.DetritusDryGPerM2 > favorableResult.DetritusDryGPerM2);
+        Assert.Equal(default, stressedResult.Botany.DailyFactors);
+    }
+
+    [Fact]
+    public void Save_schema_two_migrates_missing_genomes_deterministically()
+    {
+        var original = TestWorldFactory.Create(42, new InitialAnimalPopulationV1(4, 2));
+        var legacy = JsonNode.Parse(original.SaveToJson())!.AsObject();
+        legacy["SchemaVersion"] = 2;
+        foreach (var animal in legacy["Animals"]!.AsArray()) animal!.AsObject().Remove("Genome");
+        var legacyJson = legacy.ToJsonString();
+
+        var migrated = TestWorldFactory.Load(legacyJson);
+        var repeated = TestWorldFactory.Load(legacyJson);
+        var migratedAnimals = migrated.Snapshot().Animals;
+        Assert.Equal(6, migratedAnimals.Count);
+        Assert.All(migratedAnimals, animal => Assert.True(animal.Genome.HasValue));
+        Assert.Equal(migrated.Snapshot().Animals.Select(animal => animal.Genome!.Value.GenomeId),
+            repeated.Snapshot().Animals.Select(animal => animal.Genome!.Value.GenomeId));
+        Assert.Equal(3, JsonDocument.Parse(migrated.SaveToJson()).RootElement
+            .GetProperty("SchemaVersion").GetInt32());
+    }
+
+    [Fact]
+    public void Save_load_preserves_ecological_stocks_and_scheduler_continuation()
+    {
+        var uninterrupted = TestWorldFactory.Create(1);
+        uninterrupted.AdvanceTicks((int)SimulationState.TicksPerDay - 1);
+        var resumedAtDayBoundary = TestWorldFactory.Load(uninterrupted.SaveToJson());
+        uninterrupted.AdvanceTicks(1);
+        resumedAtDayBoundary.AdvanceTicks(1);
+        Assert.Equal(2, resumedAtDayBoundary.Snapshot().DayOfYear);
+        Assert.Equal(uninterrupted.CanonicalHash(), resumedAtDayBoundary.CanonicalHash());
+
         uninterrupted.AdvanceTicks(37);
-        var save = uninterrupted.SaveToJson();
-        var resumed = WorldSimulation.Load(save);
+        resumedAtDayBoundary.AdvanceTicks(37);
+        var beforeSave = uninterrupted.Snapshot();
+        Assert.Contains(beforeSave.Cells, cell => cell.Grass.SeedBankGPerM2 > 0
+            || cell.Woody.SeedBankGPerM2 > 0);
+        Assert.Contains(beforeSave.Cells, cell => cell.DetritusDryGPerM2 > 0);
+        var resumedWithEcology = TestWorldFactory.Load(resumedAtDayBoundary.SaveToJson());
         uninterrupted.AdvanceTicks(205);
-        resumed.AdvanceTicks(205);
-        Assert.Equal(uninterrupted.CanonicalHash(), resumed.CanonicalHash());
+        resumedWithEcology.AdvanceTicks(205);
+        Assert.Equal(uninterrupted.CanonicalHash(), resumedWithEcology.CanonicalHash());
     }
 
     [Fact]
     public void One_day_water_dry_matter_and_nitrogen_ledgers_close()
     {
-        var world = WorldSimulation.Create(1);
+        var world = TestWorldFactory.Create(1);
         var initial = world.Inventory();
         var initialGroundwater = world.Snapshot().Cells.Sum(cell => cell.GroundwaterMm);
         world.AdvanceTicks((int)SimulationState.TicksPerDay);
@@ -507,10 +843,222 @@ public sealed class L0WorldTests
     [Fact]
     public void Day_calendar_advances_on_the_144th_tick()
     {
-        var world = WorldSimulation.Create(1);
+        var world = TestWorldFactory.Create(1);
         world.AdvanceTicks(143);
         Assert.Equal(1, world.Snapshot().DayOfYear);
         world.AdvanceTicks(1);
         Assert.Equal(2, world.Snapshot().DayOfYear);
+    }
+
+    private sealed class CountingSolarForcing(ISolarForcingV1 inner) : ISolarForcingV1
+    {
+        public int CallCount { get; private set; }
+
+        public SolarForcingSampleV1 At(int dayOfYear, double solarHour, double latitudeDegrees = 45.0)
+        {
+            CallCount++;
+            return inner.At(dayOfYear, solarHour, latitudeDegrees);
+        }
+    }
+
+    private sealed class CountingGeosphere(GeosphereModuleV1 inner)
+        : IGeosphereTerrainV1, ISoilWaterV1, ISoilBiogeochemistryV1
+    {
+        public int ElevationFieldCallCount { get; private set; }
+        public int SoilProfileCallCount { get; private set; }
+        public int SoilWaterCallCount { get; private set; }
+        public int PlantTranspirationCallCount { get; private set; }
+        public int MineralNitrogenConfirmationCallCount { get; private set; }
+        public int EcologyProposalConfirmationCallCount { get; private set; }
+        public int SolarNormalFieldCallCount { get; private set; }
+        public int SolarFactorFieldCallCount { get; private set; }
+
+        public double[] GenerateElevationField(ulong seed)
+        {
+            ElevationFieldCallCount++;
+            return inner.GenerateElevationField(seed);
+        }
+
+        public double SlopeMagnitude(double[] elevations, int x, int y) => inner.SlopeMagnitude(elevations, x, y);
+
+        public double TerrainSolarFactor(double[] elevationsM, int x, int y, double sunEast, double sunNorth, double sunUp)
+            => inner.TerrainSolarFactor(elevationsM, x, y, sunEast, sunNorth, sunUp);
+
+        public TerrainSolarNormalV1[] CreateTerrainSolarNormals(double[] elevationsM)
+        {
+            SolarNormalFieldCallCount++;
+            return inner.CreateTerrainSolarNormals(elevationsM);
+        }
+
+        public double[] TerrainSolarFactors(TerrainSolarNormalV1[] normals,
+            double sunEast, double sunNorth, double sunUp)
+        {
+            SolarFactorFieldCallCount++;
+            return inner.TerrainSolarFactors(normals, sunEast, sunNorth, sunUp);
+        }
+
+        public SoilProfileV1 Profile(SoilKind kind)
+        {
+            SoilProfileCallCount++;
+            return inner.Profile(kind);
+        }
+
+        public double MaximumInfiltrationMm(SoilHydraulicStateV1 soil)
+        {
+            SoilWaterCallCount++;
+            return inner.MaximumInfiltrationMm(soil);
+        }
+
+        public SoilWaterResultV1 ApplyInfiltrationAndEvaporate(
+            SoilHydraulicStateV1 soil,
+            double infiltrationMm,
+            double plantCover,
+            double potentialEtMm,
+            double plantWaterDemandMultiplier)
+        {
+            SoilWaterCallCount++;
+            return inner.ApplyInfiltrationAndEvaporate(soil, infiltrationMm, plantCover,
+                potentialEtMm, plantWaterDemandMultiplier);
+        }
+
+        public SoilTranspirationResultV1 ApplyPlantTranspiration(
+            SoilHydraulicStateV1 soil, double proposedTranspirationMm)
+        {
+            PlantTranspirationCallCount++;
+            return inner.ApplyPlantTranspiration(soil, proposedTranspirationMm);
+        }
+
+        public double ConfirmMineralNitrogenAfterGrowth(
+            double availableMineralNitrogenGPerM2, double proposedRemainingMineralNitrogenGPerM2)
+        {
+            MineralNitrogenConfirmationCallCount++;
+            return inner.ConfirmMineralNitrogenAfterGrowth(availableMineralNitrogenGPerM2,
+                proposedRemainingMineralNitrogenGPerM2);
+        }
+
+        public SoilBiogeochemistryStateV1 ConfirmEcologyProposal(
+            SoilBiogeochemistryStateV1 current, SoilBiogeochemistryProposalV1 proposal)
+        {
+            EcologyProposalConfirmationCallCount++;
+            return inner.ConfirmEcologyProposal(current, proposal);
+        }
+
+        public double DepositMineralNitrogen(double currentMineralNitrogenGPerM2, double proposedDepositGPerM2)
+            => inner.DepositMineralNitrogen(currentMineralNitrogenGPerM2, proposedDepositGPerM2);
+    }
+
+    private sealed class CountingHydrosphere(HydrosphereModuleV1 inner) : ISurfaceWaterV1
+    {
+        public int SeedCallCount { get; private set; }
+        public int PrecipitationCallCount { get; private set; }
+        public int RouteCallCount { get; private set; }
+        public int RoutingPlanCallCount { get; private set; }
+
+        public SurfaceWaterStateV1[] SeedInitialWater(SurfaceWaterCellV1[] terrain)
+        {
+            SeedCallCount++;
+            return inner.SeedInitialWater(terrain);
+        }
+
+        public SurfaceWaterRoutingPlanV1 CreateRoutingPlan(SurfaceWaterCellV1[] terrain)
+        {
+            RoutingPlanCallCount++;
+            return inner.CreateRoutingPlan(terrain);
+        }
+
+        public SurfaceWaterExchangeResultV1 ReceivePrecipitation(
+            SurfaceWaterStateV1 water,
+            double precipitationMm,
+            double plantCover,
+            double soilInfiltrationCapacityMm,
+            double potentialEtMm)
+        {
+            PrecipitationCallCount++;
+            return inner.ReceivePrecipitation(water, precipitationMm, plantCover,
+                soilInfiltrationCapacityMm, potentialEtMm);
+        }
+
+        public SurfaceFlowResultV1 Route(SurfaceWaterCellV1[] source)
+        {
+            RouteCallCount++;
+            return inner.Route(source);
+        }
+
+        public SurfaceFlowResultV1 Route(SurfaceWaterCellV1[] source, SurfaceWaterRoutingPlanV1 routingPlan)
+        {
+            RouteCallCount++;
+            return inner.Route(source, routingPlan);
+        }
+
+        public SurfaceWaterWithdrawalResultV1 AllocateAnimalWater(
+            SurfaceWaterCellV1[] source,
+            SurfaceWaterDemandV1[] demands)
+            => inner.AllocateAnimalWater(source, demands);
+
+        public SurfaceWaterStateV1[] DepositAnimalWater(
+            SurfaceWaterCellV1[] source,
+            SurfaceWaterDepositV1[] deposits)
+            => inner.DepositAnimalWater(source, deposits);
+    }
+
+    private sealed class CountingBiosphere(BiosphereModuleV1 inner) : IBotanyV1, IEcologyV1, IZoologyV1,
+        IZoologyGeneticsV1
+    {
+        public int InitialPatchCallCount { get; private set; }
+        public int GrowthCallCount { get; private set; }
+        public int SeedDispersalCallCount { get; private set; }
+
+        public double TotalCover(PlantPatchPair plants) => inner.TotalCover(plants);
+
+        public PlantCoverV1 CoverComponents(PlantPatchPair plants) => inner.CoverComponents(plants);
+
+        public BotanyCellStateV1[] DisperseSeeds(
+            BotanyCellStateV1[] states, BotanyHourResultV1[] hourlyResults)
+        {
+            SeedDispersalCallCount++;
+            return inner.DisperseSeeds(states, hourlyResults);
+        }
+
+        public BotanyHourResultV1 GrowHour(BotanyHourInputV1 input)
+        {
+            GrowthCallCount++;
+            return inner.GrowHour(input);
+        }
+
+        public BotanyHourResultV1 GrowHour(BotanyHourInputV1 input, PlantCoverV1 cover)
+        {
+            GrowthCallCount++;
+            return inner.GrowHour(input, cover);
+        }
+
+        public HerbivoryResolutionV1 ResolveHerbivory(PlantPatch patch, PlantKind kind, HerbivoryRequestV1[] requests)
+            => inner.ResolveHerbivory(patch, kind, requests);
+
+        public PlantPatchPair[] CreateInitialPatches(
+            ulong seed, double[] elevationsM, double[] surfaceWaterMm, double[] terrainSlopeMagnitude)
+        {
+            InitialPatchCallCount++;
+            return inner.CreateInitialPatches(seed, elevationsM, surfaceWaterMm, terrainSlopeMagnitude);
+        }
+
+        public EcologyDailyResultV1 CloseDay(EcologyDailyInputV1 input) => inner.CloseDay(input);
+
+        public EcologyDetritusStateV1 ConfirmDetritusDeposit(
+            EcologyDetritusStateV1 current,
+            EcologyDetritusStateV1 proposedDeposit)
+            => inner.ConfirmDetritusDeposit(current, proposedDeposit);
+
+        public AnimalAgentV1[] CreateInitialPopulation(ulong seed, ZoologyCellStateV1[] cells, InitialAnimalPopulationV1 population)
+            => inner.CreateInitialPopulation(seed, cells, population);
+
+        public AnimalAgentV1[] EnsureGenomes(ulong seed, AnimalAgentV1[] animals)
+            => inner.EnsureGenomes(seed, animals);
+
+        public ZoologyTickResultV1 AdvanceTick(ZoologyTickInputV1 input) => inner.AdvanceTick(input);
+
+        public ZoologyWaterPreparationV1 PrepareDailyWater(AnimalAgentV1[] animals)
+            => inner.PrepareDailyWater(animals);
+
+        public ZoologyDailyResultV1 CloseDay(ZoologyDailyInputV1 input) => inner.CloseDay(input);
     }
 }

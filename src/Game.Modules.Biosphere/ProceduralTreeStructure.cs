@@ -44,6 +44,17 @@ public enum LeafVerticalPattern : byte
     MidCrownMaximum
 }
 
+/// <summary>
+/// Qualitative biological potential for visible surface roots in a tree profile. Actual exposure
+/// also depends on site conditions, which are not currently modeled here; values are not calibrated.
+/// </summary>
+public readonly record struct TreeRootTraits(
+    int SurfaceRootCount,
+    float LateralSpreadRatio,
+    float SurfaceRootThicknessRatio,
+    float AzimuthJitter,
+    float SurfaceRootExpressionPotential);
+
 /// <summary>Tree-form recipe for a deterministic skeleton; the current entries are visual archetypes, not taxa.</summary>
 public sealed record TreeRenderProfile(
     int RenderRow,
@@ -71,7 +82,12 @@ public sealed record TreeRenderProfile(
     float TerminalLengthRatio = 0.43f,
     float GravitySagRatio = 0.07f,
     float SecondaryDivergenceDegrees = 44f,
-    float TerminalDivergenceDegrees = 38f);
+    float TerminalDivergenceDegrees = 38f,
+    float TrunkBaseFlareRatio = 0.25f,
+    float TrunkTaperExponent = 1.12f,
+    float TrunkIrregularity = 0.10f,
+    float TrunkLeanRatio = 0.055f,
+    float TrunkCurveRatio = 0.032f);
 
 /// <summary>A tapered, connected segment in the tree's camera-independent branch graph.</summary>
 public readonly record struct TreeBranchSegment(
@@ -94,12 +110,14 @@ public sealed class ProceduralTreeStructure
 {
     internal ProceduralTreeStructure(
         TreeRenderProfile profile,
+        TreeRootTraits rootTraits,
         float height,
         float maturity,
         TreeBranchSegment[] branches,
         TreeFoliageSite[] foliage)
     {
         Profile = profile;
+        RootTraits = rootTraits;
         Height = height;
         Maturity = maturity;
         Branches = branches;
@@ -107,6 +125,7 @@ public sealed class ProceduralTreeStructure
     }
 
     public TreeRenderProfile Profile { get; }
+    public TreeRootTraits RootTraits { get; }
     public float Height { get; }
     public float Maturity { get; }
     public IReadOnlyList<TreeBranchSegment> Branches { get; }
@@ -125,33 +144,55 @@ public static class ProceduralTreeGenerator
     private static readonly TreeRenderProfile[] Profiles =
     [
         new(0, "temperate-oak", TreeArchitecture.SpreadingBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
-            0.43f, 0.96f, 0.39f, 0.026f, 0.36f, 0.32f, 0.02f, 7, 3, 3, 4, 4,
-            LeafVerticalPattern.MidCrownMaximum, PrimaryBranchRadiusRatio: 0.66f,
-            CrownShape: TreeCrownShape.Spherical, SecondaryLengthRatio: 0.65f,
-            TertiaryLengthRatio: 0.54f, TerminalLengthRatio: 0.45f, GravitySagRatio: 0.13f,
-            SecondaryDivergenceDegrees: 49f, TerminalDivergenceDegrees: 43f),
+            0.36f, 0.96f, 0.42f, 0.026f, 0.27f, 0.24f, 0.04f, 6, 3, 3, 4, 4,
+            LeafVerticalPattern.MidCrownMaximum, PrimaryBranchRadiusRatio: 0.76f,
+            CrownShape: TreeCrownShape.Hemispherical, SecondaryLengthRatio: 0.69f,
+            TertiaryLengthRatio: 0.57f, TerminalLengthRatio: 0.46f, GravitySagRatio: 0.16f,
+            SecondaryDivergenceDegrees: 55f, TerminalDivergenceDegrees: 47f,
+            TrunkBaseFlareRatio: 0.62f, TrunkTaperExponent: 1.28f, TrunkIrregularity: 0.21f,
+            TrunkLeanRatio: 0.075f, TrunkCurveRatio: 0.055f),
         new(1, "temperate-pine", TreeArchitecture.ConicalConifer, FoliageMorphology.Needle, LeafHabit.Evergreen,
             0.12f, 0.98f, 0.34f, 0.018f, -0.07f, -0.10f, 0.00f, 20, 2, 2, 2, 4,
             PrimaryBranchRadiusRatio: 0.48f, CrownShape: TreeCrownShape.Conical, SecondaryLengthRatio: 0.58f,
             TertiaryLengthRatio: 0.48f, TerminalLengthRatio: 0.40f, GravitySagRatio: 0.10f,
-            SecondaryDivergenceDegrees: 37f, TerminalDivergenceDegrees: 31f),
+            SecondaryDivergenceDegrees: 37f, TerminalDivergenceDegrees: 31f,
+            TrunkBaseFlareRatio: 0.14f, TrunkTaperExponent: 0.90f, TrunkIrregularity: 0.09f,
+            TrunkLeanRatio: 0.028f, TrunkCurveRatio: 0.018f),
         new(2, "temperate-birch", TreeArchitecture.UprightBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
-            0.46f, 0.97f, 0.27f, 0.014f, 0.28f, 0.38f, 0.00f, 6, 3, 3, 4, 4,
-            LeafVerticalPattern.LargerTowardCrownBase, PrimaryBranchRadiusRatio: 0.67f,
+            0.44f, 0.98f, 0.24f, 0.014f, 0.43f, 0.45f, 0.00f, 6, 3, 3, 4, 4,
+            LeafVerticalPattern.LargerTowardCrownBase, PrimaryBranchRadiusRatio: 0.59f,
             CrownShape: TreeCrownShape.TaperedCylindrical, SecondaryLengthRatio: 0.60f,
             TertiaryLengthRatio: 0.47f, TerminalLengthRatio: 0.38f, GravitySagRatio: 0.055f,
-            SecondaryDivergenceDegrees: 42f, TerminalDivergenceDegrees: 35f),
+            SecondaryDivergenceDegrees: 42f, TerminalDivergenceDegrees: 35f,
+            TrunkBaseFlareRatio: 0.11f, TrunkTaperExponent: 0.92f, TrunkIrregularity: 0.12f,
+            TrunkLeanRatio: 0.052f, TrunkCurveRatio: 0.047f),
         new(3, "temperate-maple", TreeArchitecture.SpreadingBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
-            0.48f, 0.96f, 0.37f, 0.023f, 0.34f, 0.28f, 0.00f, 7, 3, 3, 4, 4,
-            PrimaryBranchRadiusRatio: 0.64f, CrownShape: TreeCrownShape.Spherical, SecondaryLengthRatio: 0.66f,
-            TertiaryLengthRatio: 0.55f, TerminalLengthRatio: 0.46f, GravitySagRatio: 0.12f,
-            SecondaryDivergenceDegrees: 51f, TerminalDivergenceDegrees: 45f),
+            0.40f, 0.96f, 0.35f, 0.023f, 0.39f, 0.37f, 0.00f, 8, 3, 3, 4, 4,
+            PrimaryBranchRadiusRatio: 0.63f, CrownShape: TreeCrownShape.Spherical, SecondaryLengthRatio: 0.63f,
+            TertiaryLengthRatio: 0.51f, TerminalLengthRatio: 0.43f, GravitySagRatio: 0.085f,
+            SecondaryDivergenceDegrees: 47f, TerminalDivergenceDegrees: 42f,
+            TrunkBaseFlareRatio: 0.42f, TrunkTaperExponent: 1.05f, TrunkIrregularity: 0.17f,
+            TrunkLeanRatio: 0.060f, TrunkCurveRatio: 0.050f),
         new(4, "temperate-willow", TreeArchitecture.WeepingBroadleaf, FoliageMorphology.Broadleaf, LeafHabit.Deciduous,
-            0.36f, 0.86f, 0.43f, 0.020f, 0.20f, 0.10f, 0.58f, 8, 3, 3, 4, 4,
-            PrimaryBranchRadiusRatio: 0.62f, CrownShape: TreeCrownShape.Hemispherical, SecondaryLengthRatio: 0.68f,
-            TertiaryLengthRatio: 0.59f, TerminalLengthRatio: 0.50f, GravitySagRatio: 0.11f,
-            SecondaryDivergenceDegrees: 54f, TerminalDivergenceDegrees: 49f)
+            0.30f, 0.88f, 0.46f, 0.020f, 0.16f, 0.09f, 0.78f, 8, 3, 3, 4, 4,
+            PrimaryBranchRadiusRatio: 0.66f, CrownShape: TreeCrownShape.Hemispherical, SecondaryLengthRatio: 0.72f,
+            TertiaryLengthRatio: 0.64f, TerminalLengthRatio: 0.54f, GravitySagRatio: 0.15f,
+            SecondaryDivergenceDegrees: 57f, TerminalDivergenceDegrees: 52f,
+            TrunkBaseFlareRatio: 0.31f, TrunkTaperExponent: 1.12f, TrunkIrregularity: 0.15f,
+            TrunkLeanRatio: 0.082f, TrunkCurveRatio: 0.060f)
     ];
+
+    // Biological root phenotypes are keyed by the current visual archetype identity only
+    // because the aggregated flora snapshot does not yet publish an individual species ID.
+    private static readonly IReadOnlyDictionary<string, TreeRootTraits> RootTraitsByProfileId =
+        new Dictionary<string, TreeRootTraits>(StringComparer.Ordinal)
+        {
+            ["temperate-oak"] = new(6, 3.7f, 0.43f, 0.58f, 0.82f),
+            ["temperate-pine"] = new(4, 2.7f, 0.31f, 0.28f, 0f),
+            ["temperate-birch"] = new(4, 2.9f, 0.32f, 0.48f, 0f),
+            ["temperate-maple"] = new(5, 3.4f, 0.40f, 0.52f, 0.30f),
+            ["temperate-willow"] = new(7, 4.1f, 0.39f, 0.62f, 0.12f)
+        };
 
     public static IReadOnlyList<TreeRenderProfile> RenderProfiles { get; } = Array.AsReadOnly(Profiles);
 
@@ -194,10 +235,12 @@ public static class ProceduralTreeGenerator
         var foliage = new List<TreeFoliageSite>(32);
         var primaryTips = new List<CrownTip>(profile.PrimaryBranchCount);
         var trunkSegments = 10;
-        var leanX = (Unit(seed, 0x545245454C45414EUL, 0) - 0.5f) * height * 0.055f;
-        var leanZ = (Unit(seed, 0x545245454C45414EUL, 1) - 0.5f) * height * 0.055f;
-        var trunkBendX = (Unit(seed, 0x5452454542454E44UL, 0) - 0.5f) * height * 0.032f;
-        var trunkBendZ = (Unit(seed, 0x5452454542454E44UL, 1) - 0.5f) * height * 0.032f;
+        var leanX = (Unit(seed, 0x545245454C45414EUL, 0) - 0.5f) * height * profile.TrunkLeanRatio;
+        var leanZ = (Unit(seed, 0x545245454C45414EUL, 1) - 0.5f) * height * profile.TrunkLeanRatio;
+        var trunkBendX = (Unit(seed, 0x5452454542454E44UL, 0) - 0.5f) * height * profile.TrunkCurveRatio;
+        var trunkBendZ = (Unit(seed, 0x5452454542454E44UL, 1) - 0.5f) * height * profile.TrunkCurveRatio;
+        var individualTrunkScale = 0.88f + Unit(seed, 0x5452454554524B52UL, 0) * 0.24f;
+        var individualFlareScale = 0.78f + Unit(seed, 0x54524545464C4152UL, 0) * 0.44f;
 
         Vector3 TrunkAt(float t)
         {
@@ -206,7 +249,16 @@ public static class ProceduralTreeGenerator
                 height * t,
                 leanZ * t * t + trunkBendZ * gentleSway);
         }
-        float TrunkRadiusAt(float t) => height * profile.TrunkRadius * (0.13f + 0.87f * MathF.Pow(1 - t, 1.12f));
+        float TrunkRadiusAt(float t)
+        {
+            var remaining = 1f - t;
+            var taper = 0.14f + 0.86f * MathF.Pow(remaining, profile.TrunkTaperExponent);
+            var basalFlare = 1f + profile.TrunkBaseFlareRatio * individualFlareScale * MathF.Pow(remaining, 5.5f);
+            var irregularity = 1f
+                + profile.TrunkIrregularity * 0.22f * MathF.Sin(MathF.Tau * t * 1.6f + Unit(seed, 0x5452454552414449UL, 0) * Tau)
+                + profile.TrunkIrregularity * 0.12f * MathF.Sin(MathF.Tau * t * 2.7f + Unit(seed, 0x5452454552414449UL, 1) * Tau);
+            return height * profile.TrunkRadius * individualTrunkScale * taper * basalFlare * irregularity;
+        }
 
         for (var index = 0; index < trunkSegments; index++)
         {
@@ -273,7 +325,8 @@ public static class ProceduralTreeGenerator
 
         ApplyBranchSupport(branches, foliage);
 
-        return new ProceduralTreeStructure(profile, height, maturity, branches.ToArray(), foliage.ToArray());
+        return new ProceduralTreeStructure(profile, RootTraitsByProfileId[profile.ProfileId],
+            height, maturity, branches.ToArray(), foliage.ToArray());
     }
 
     private static void ApplyBranchSupport(

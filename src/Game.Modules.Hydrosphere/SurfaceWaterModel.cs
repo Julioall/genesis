@@ -1,8 +1,8 @@
+using System.Buffers;
 using Game.Contracts;
 
 namespace Game.Modules.Hydrosphere;
 
-public readonly record struct SurfaceFlowResult(WorldCell[] Cells, double OutflowLiters);
 public readonly record struct SurfaceDrainageField(int[] Receiver, double[] Accumulation);
 public readonly record struct DepressionBasin(int Id, double SpillElevationM, int[] Cells, double CapacityM3);
 public readonly record struct HydrologyTopology(
@@ -14,6 +14,8 @@ public readonly record struct HydrologyTopology(
 
 public static class SurfaceWaterModel
 {
+    private sealed record FlowNeighborLayout(int[] Offsets, int[] Targets);
+
     private const double Diffusion = 0.02;
     public const int ChannelThresholdCells = 12;
     private const double InitialAquiferStorageMm = 2600;
@@ -23,8 +25,9 @@ public static class SurfaceWaterModel
     [
         (-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1)
     ];
+    private static readonly FlowNeighborLayout FlowNeighbors = CreateFlowNeighborLayout();
 
-    public static SurfaceDrainageField AnalyzeDrainage(WorldCell[] terrain)
+    public static SurfaceDrainageField AnalyzeDrainage(SurfaceWaterCellV1[] terrain)
     {
         var drainage = BuildDrainage(terrain);
         return new(drainage.Receiver, drainage.Accumulation);
@@ -34,7 +37,7 @@ public static class SurfaceWaterModel
     /// Conditions depressions for drainage analysis while preserving the input bed elevations.
     /// Filled elevations are a separate topological field; they are not written back to the world.
     /// </summary>
-    public static HydrologyTopology AnalyzeHydrology(WorldCell[] terrain)
+    public static HydrologyTopology AnalyzeHydrology(SurfaceWaterCellV1[] terrain)
     {
         ArgumentNullException.ThrowIfNull(terrain);
         var width = SimulationState.Width;
@@ -127,7 +130,7 @@ public static class SurfaceWaterModel
 
     /// <summary>Returns the stored volume under a level pool, capped at the basin spill elevation.</summary>
     public static double DepressionVolumeAtStageM3(
-        WorldCell[] terrain, DepressionBasin basin, double stageM, double cellAreaM2 = SimulationState.CellAreaM2)
+        SurfaceWaterCellV1[] terrain, DepressionBasin basin, double stageM, double cellAreaM2 = SimulationState.CellAreaM2)
     {
         ArgumentNullException.ThrowIfNull(terrain);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cellAreaM2);
@@ -140,7 +143,7 @@ public static class SurfaceWaterModel
 
     /// <summary>Returns the basin area submerged by a level pool, capped at the spill elevation.</summary>
     public static double DepressionAreaAtStageM2(
-        WorldCell[] terrain, DepressionBasin basin, double stageM, double cellAreaM2 = SimulationState.CellAreaM2)
+        SurfaceWaterCellV1[] terrain, DepressionBasin basin, double stageM, double cellAreaM2 = SimulationState.CellAreaM2)
     {
         ArgumentNullException.ThrowIfNull(terrain);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cellAreaM2);
@@ -149,13 +152,13 @@ public static class SurfaceWaterModel
     }
 
     /// <summary>Creates the initial surface-water stores from the terrain's D8 drainage network.</summary>
-    public static WorldCell[] SeedInitialWater(WorldCell[] terrain)
+    public static SurfaceWaterCellV1[] SeedInitialWater(SurfaceWaterCellV1[] terrain)
     {
         var drainage = BuildDrainage(terrain);
         var receiver = drainage.Receiver;
         var accumulation = drainage.Accumulation;
 
-        var result = (WorldCell[])terrain.Clone();
+        var result = (SurfaceWaterCellV1[])terrain.Clone();
         for (var i = 0; i < result.Length; i++)
         {
             var cellsOfFlow = accumulation[i];
@@ -208,13 +211,85 @@ public static class SurfaceWaterModel
         return result;
     }
 
-    public static SurfaceFlowResult Route(WorldCell[] source)
+    public static SurfaceWaterExchangeResultV1 ReceivePrecipitation(
+        SurfaceWaterStateV1 water,
+        double precipitationMm,
+        double plantCover,
+        double soilInfiltrationCapacityMm,
+        double potentialEtMm)
     {
-        var drainage = BuildDrainage(source);
-        var working = (WorldCell[])source.Clone();
-        for (var i = 0; i < working.Length; i++)
+        if (!double.IsFinite(water.SurfaceWaterMm) || water.SurfaceWaterMm < 0
+            || !double.IsFinite(precipitationMm) || precipitationMm < 0
+            || !double.IsFinite(plantCover) || plantCover is < 0 or > 1
+            || !double.IsFinite(soilInfiltrationCapacityMm) || soilInfiltrationCapacityMm < 0
+            || !double.IsFinite(potentialEtMm) || potentialEtMm < 0)
+            throw new ArgumentOutOfRangeException(nameof(precipitationMm), "Surface-water exchange inputs must be finite and within their physical ranges.");
+
+        var intercepted = 0.15 * plantCover * precipitationMm;
+        var availableSurface = water.SurfaceWaterMm + precipitationMm - intercepted;
+        var infiltration = Math.Min(availableSurface, soilInfiltrationCapacityMm);
+        var surfaceBeforeEvaporation = availableSurface - infiltration;
+        var waterCover = Math.Clamp(surfaceBeforeEvaporation / 10, 0, 1);
+        var waterEvaporation = Math.Min(surfaceBeforeEvaporation, potentialEtMm * waterCover);
+
+        return new(
+            surfaceBeforeEvaporation - waterEvaporation,
+            infiltration,
+            waterEvaporation,
+            intercepted,
+            1 - waterCover);
+    }
+
+    public static SurfaceFlowResultV1 Route(SurfaceWaterCellV1[] source)
+    {
+        var routingPlan = CreateRoutingPlan(source);
+        return Route(source, routingPlan);
+    }
+
+    public static SurfaceWaterRoutingPlanV1 CreateRoutingPlan(SurfaceWaterCellV1[] terrain)
+    {
+        ArgumentNullException.ThrowIfNull(terrain);
+        if (terrain.Length != SimulationState.Width * SimulationState.Height)
+            throw new ArgumentException("A routing plan requires a complete surface-water terrain field.", nameof(terrain));
+        for (var index = 0; index < terrain.Length; index++)
         {
-            var cellsOfFlow = drainage.Accumulation[i];
+            var cell = terrain[index];
+            if (cell.Index != index || cell.X != index % SimulationState.Width
+                || cell.Y != index / SimulationState.Width || !double.IsFinite(cell.ElevationM))
+                throw new ArgumentException("Routing terrain must use finite elevations and canonical row-major cell identities.", nameof(terrain));
+        }
+        var drainage = BuildDrainage(terrain);
+        return new(terrain.Select(cell => cell.ElevationM).ToArray(), drainage.Accumulation);
+    }
+
+    public static SurfaceFlowResultV1 Route(SurfaceWaterCellV1[] source, SurfaceWaterRoutingPlanV1 routingPlan)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.Length != SimulationState.Width * SimulationState.Height
+            || routingPlan.ElevationM is null || routingPlan.FlowAccumulation is null
+            || routingPlan.ElevationM.Length != source.Length || routingPlan.FlowAccumulation.Length != source.Length)
+            throw new ArgumentException("Surface-water source and routing plan must cover the complete world.", nameof(routingPlan));
+        for (var index = 0; index < source.Length; index++)
+        {
+            var cell = source[index];
+            if (cell.Index != index || cell.X != index % SimulationState.Width
+                || cell.Y != index / SimulationState.Width || cell.ElevationM != routingPlan.ElevationM[index]
+                || !double.IsFinite(cell.SurfaceWaterMm) || cell.SurfaceWaterMm < 0
+                || !double.IsFinite(cell.GroundwaterMm) || cell.GroundwaterMm < 0
+                || !double.IsFinite(routingPlan.FlowAccumulation[index]) || routingPlan.FlowAccumulation[index] < 1)
+                throw new ArgumentException("Surface-water source does not match its immutable routing plan or contains invalid stocks.", nameof(source));
+        }
+        var accumulation = routingPlan.FlowAccumulation;
+        var working = ArrayPool<SurfaceWaterCellV1>.Shared.Rent(source.Length);
+        var outgoing = ArrayPool<double>.Shared.Rent(source.Length);
+        var delta = ArrayPool<double>.Shared.Rent(source.Length);
+        try
+        {
+        Array.Copy(source, working, source.Length);
+        Array.Clear(outgoing, 0, source.Length);
+        for (var i = 0; i < source.Length; i++)
+        {
+            var cellsOfFlow = accumulation[i];
             if (cellsOfFlow < ChannelThresholdCells || working[i].GroundwaterMm <= 0) continue;
             var baseflow = BaseflowMinimumMmPerHour
                 + BaseflowPerLog2AreaMmPerHour * Math.Log2(cellsOfFlow / ChannelThresholdCells);
@@ -226,18 +301,18 @@ public static class SurfaceWaterModel
             };
         }
 
-        var proposed = new List<(int From, int To, double Mm)>();
-        var outgoing = new double[working.Length];
-        for (var i = 0; i < working.Length; i++)
+        var proposed = new List<(int From, int To, double Mm)>(source.Length * 2);
+        for (var i = 0; i < source.Length; i++)
         {
             var cell = working[i];
+            var hasSurfaceWater = cell.SurfaceWaterMm > 0;
             var head = cell.ElevationM + cell.SurfaceWaterMm / 1000;
-            foreach (var (dx, dy) in Neighbors)
+            for (var neighbor = FlowNeighbors.Offsets[i]; neighbor < FlowNeighbors.Offsets[i + 1]; neighbor++)
             {
-                var x = cell.X + dx;
-                var y = cell.Y + dy;
-                if (x < 0 || x >= SimulationState.Width || y < 0 || y >= SimulationState.Height)
+                var target = FlowNeighbors.Targets[neighbor];
+                if (target < 0)
                 {
+                    if (!hasSurfaceWater) continue;
                     var boundary = Diffusion * cell.SurfaceWaterMm;
                     if (boundary > 0)
                     {
@@ -246,14 +321,13 @@ public static class SurfaceWaterModel
                     }
                     continue;
                 }
-
-                var target = y * SimulationState.Width + x;
-                if (target <= i) continue;
                 var other = working[target];
+                if (!hasSurfaceWater && other.SurfaceWaterMm <= 0) continue;
                 var otherHead = other.ElevationM + other.SurfaceWaterMm / 1000;
                 if (head == otherHead) continue;
                 var from = head > otherHead ? i : target;
                 var to = head > otherHead ? target : i;
+                if (working[from].SurfaceWaterMm <= 0) continue;
                 var flow = Diffusion * 1000 * Math.Abs(head - otherHead);
                 if (flow <= 0) continue;
                 proposed.Add((from, to, flow));
@@ -261,7 +335,7 @@ public static class SurfaceWaterModel
             }
         }
 
-        var delta = new double[working.Length];
+        Array.Clear(delta, 0, source.Length);
         var outflowLiters = 0.0;
         foreach (var proposal in proposed)
         {
@@ -275,13 +349,140 @@ public static class SurfaceWaterModel
             else delta[proposal.To] += flow;
         }
 
-        var result = working;
+        var result = new SurfaceWaterStateV1[source.Length];
         for (var i = 0; i < result.Length; i++)
-            result[i] = result[i] with { SurfaceWaterMm = Math.Max(0, result[i].SurfaceWaterMm + delta[i]) };
+            result[i] = new(working[i].Index,
+                Math.Max(0, working[i].SurfaceWaterMm + delta[i]), working[i].GroundwaterMm);
         return new(result, outflowLiters);
+        }
+        finally
+        {
+            ArrayPool<SurfaceWaterCellV1>.Shared.Return(working);
+            ArrayPool<double>.Shared.Return(outgoing);
+            ArrayPool<double>.Shared.Return(delta);
+        }
     }
 
-    private static DrainageNetwork BuildDrainage(WorldCell[] terrain)
+    private static FlowNeighborLayout CreateFlowNeighborLayout()
+    {
+        var width = SimulationState.Width;
+        var height = SimulationState.Height;
+        var offsets = new int[width * height + 1];
+        var targets = new List<int>(width * height * 5);
+        for (var index = 0; index < width * height; index++)
+        {
+            var x = index % width;
+            var y = index / width;
+            offsets[index] = targets.Count;
+            for (var neighbor = 0; neighbor < Neighbors.Length; neighbor++)
+            {
+                var nx = x + Neighbors[neighbor].X;
+                var ny = y + Neighbors[neighbor].Y;
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height)
+                {
+                    targets.Add(-1);
+                    continue;
+                }
+                var target = ny * width + nx;
+                if (target > index) targets.Add(target);
+            }
+        }
+        offsets[^1] = targets.Count;
+        return new(offsets, targets.ToArray());
+    }
+
+    public static SurfaceWaterWithdrawalResultV1 AllocateAnimalWater(
+        SurfaceWaterCellV1[] source,
+        SurfaceWaterDemandV1[] demands)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(demands);
+        if (source.Length != SimulationState.Width * SimulationState.Height)
+            throw new ArgumentException("Surface-water withdrawals require a complete world field.", nameof(source));
+        for (var index = 0; index < source.Length; index++)
+        {
+            if (source[index].Index != index || source[index].X != index % SimulationState.Width
+                || source[index].Y != index / SimulationState.Width
+                || !double.IsFinite(source[index].SurfaceWaterMm) || source[index].SurfaceWaterMm < 0
+                || !double.IsFinite(source[index].GroundwaterMm) || source[index].GroundwaterMm < 0)
+                throw new ArgumentException("Surface-water source stocks or cell identities are invalid.", nameof(source));
+        }
+        var grants = new List<SurfaceWaterGrantV1>(demands.Length);
+        var updated = source.Select(cell => new SurfaceWaterStateV1(
+            cell.Index, cell.SurfaceWaterMm, cell.GroundwaterMm)).ToArray();
+        var consumerIds = new HashSet<ulong>();
+        var ordered = demands.OrderBy(demand => demand.CellIndex).ThenBy(demand => demand.ConsumerId).ToArray();
+        foreach (var demand in ordered)
+        {
+            if (demand.CellIndex < 0 || demand.CellIndex >= source.Length || demand.ConsumerId == 0
+                || !double.IsFinite(demand.RequestedLiters) || demand.RequestedLiters < 0
+                || !consumerIds.Add(demand.ConsumerId))
+                throw new ArgumentException("Surface-water demands must have unique consumers and finite non-negative amounts.", nameof(demands));
+        }
+
+        foreach (var cellGroup in ordered.GroupBy(demand => demand.CellIndex))
+        {
+            var cellIndex = cellGroup.Key;
+            if (source[cellIndex].Index != cellIndex)
+                throw new ArgumentException("Surface-water source cells must use row-major index order.", nameof(source));
+            var requestedL = cellGroup.Sum(demand => demand.RequestedLiters);
+            if (!double.IsFinite(requestedL))
+                throw new ArgumentException("Combined surface-water demand is not finite.", nameof(demands));
+            var availableL = Math.Max(0, source[cellIndex].SurfaceWaterMm) * SimulationState.CellAreaM2;
+            var scale = requestedL <= 0 ? 0 : Math.Min(1, availableL / requestedL);
+            var grantedL = 0.0;
+            foreach (var demand in cellGroup)
+            {
+                var amount = demand.RequestedLiters * scale;
+                grantedL += amount;
+                grants.Add(new(demand.ConsumerId, amount));
+            }
+            updated[cellIndex] = updated[cellIndex] with
+            {
+                SurfaceWaterMm = Math.Max(0, updated[cellIndex].SurfaceWaterMm - grantedL / SimulationState.CellAreaM2)
+            };
+        }
+        return new(updated, grants.ToArray());
+    }
+
+    public static SurfaceWaterStateV1[] DepositAnimalWater(
+        SurfaceWaterCellV1[] source,
+        SurfaceWaterDepositV1[] deposits)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(deposits);
+        if (source.Length != SimulationState.Width * SimulationState.Height)
+            throw new ArgumentException("Surface-water deposits require a complete world field.", nameof(source));
+        for (var index = 0; index < source.Length; index++)
+        {
+            if (source[index].Index != index || source[index].X != index % SimulationState.Width
+                || source[index].Y != index / SimulationState.Width
+                || !double.IsFinite(source[index].SurfaceWaterMm) || source[index].SurfaceWaterMm < 0
+                || !double.IsFinite(source[index].GroundwaterMm) || source[index].GroundwaterMm < 0)
+                throw new ArgumentException("Surface-water source stocks or cell identities are invalid.", nameof(source));
+        }
+        var updated = source.Select(cell => new SurfaceWaterStateV1(
+            cell.Index, cell.SurfaceWaterMm, cell.GroundwaterMm)).ToArray();
+        foreach (var group in deposits.OrderBy(deposit => deposit.CellIndex).GroupBy(deposit => deposit.CellIndex))
+        {
+            var cellIndex = group.Key;
+            if (cellIndex < 0 || cellIndex >= source.Length || source[cellIndex].Index != cellIndex)
+                throw new ArgumentException("Surface-water deposits refer to an invalid cell.", nameof(deposits));
+            var totalLiters = group.Sum(deposit => deposit.Liters);
+            if (!double.IsFinite(totalLiters) || totalLiters < 0)
+                throw new ArgumentException("Surface-water deposits must be finite and non-negative.", nameof(deposits));
+            var updatedSurfaceWaterMm = updated[cellIndex].SurfaceWaterMm + totalLiters / SimulationState.CellAreaM2;
+            if (!double.IsFinite(updatedSurfaceWaterMm))
+                throw new ArgumentException("Surface-water deposits exceed the supported numeric range.", nameof(deposits));
+            updated[cellIndex] = updated[cellIndex] with
+            {
+                SurfaceWaterMm = updatedSurfaceWaterMm
+            };
+        }
+        return updated;
+    }
+
+    private static DrainageNetwork BuildDrainage(SurfaceWaterCellV1[] terrain)
     {
         var receiver = Enumerable.Repeat(-1, terrain.Length).ToArray();
         var accumulation = Enumerable.Repeat(1.0, terrain.Length).ToArray();

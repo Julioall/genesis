@@ -1,9 +1,9 @@
 # ADR-0002 — composição headless L0 e apresentação MonoGame
 
-- **Status:** princípios científicos e stack MonoGame vigentes; restrições visuais antigas atualizadas por ADR-0004
+- **Status:** princípios científicos e stack MonoGame vigentes; apresentação atualizada por ADR-0004; composição em Core substituída por ADR-0005
 - **Data:** 21/10/2026
 
-> Este registro preserva a decisão e o contexto da implementação inicial. ADR-0004 reafirma MonoGame como stack obrigatória e atualiza as opções de câmera e estilo; composição headless, snapshots e isolamento da simulação permanecem vigentes.
+> Este registro preserva a decisão e o contexto da implementação inicial. ADR-0004 reafirma MonoGame como stack obrigatória e atualiza as opções de câmera e estilo. A decisão de compor implementações no Core foi substituída por ADR-0005; composição headless, snapshots e isolamento da simulação permanecem vigentes.
 
 ## Contexto
 
@@ -12,7 +12,7 @@ O contrato documental propõe uma implementação incremental em C#, com estado 
 ## Decisão
 
 - Manter C#/.NET e usar `MonoGame.Framework.DesktopGL` para a janela mínima; o núcleo, runner e testes não referenciam MonoGame.
-- Compor as implementações de domínio explicitamente no `Game.Core`. Os módulos compartilham DTOs em `Game.Contracts`; o formato salvo carrega um `schemaVersion`. Módulos não referenciam implementações de outros domínios. O Core agenda processos e publica snapshots; os processos científicos permanecem em Cosmos, Atmosphere, Geosphere, Hydrosphere e Biosphere.
+- **Decisão histórica, substituída por ADR-0005:** compor as implementações de domínio no `Game.Core`. Os módulos compartilham DTOs em `Game.Contracts`; o formato salvo carrega um `schemaVersion`. Módulos não referenciam implementações de outros domínios. A decisão vigente compõe providers nos executáveis e mantém Core dependente somente de Contracts.
 - Persistir o estado necessário à continuação, inclusive relógio, estoque de solo/água/flora, acumuladores diários, idade de chuva por zona e previsão horária já estabelecida. Campos renderizados são cópias de leitura.
 - Gerar silhuetas e pixels por código em cache da sessão. Variações visuais são derivadas por uma função separada da seed ecológica. Sazonalidade de folhas é somente aparência; não representa estoque de folhas nem altera a simulação.
 - Rochas visuais são uma composição determinística baseada em elevação e variação visual; não representam estoque geológico L0, colisão nem recurso mineral.

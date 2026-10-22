@@ -7,7 +7,7 @@ Os marcos N0–N4 são **internos**. Só declare **MVP Natural aprovado** quando
 | N0 — Base | Solution `Game.sln`, projetos usados pelo boot, contratos mínimos, agenda sequencial, runner headless, CI e teste pequeno | compila; estado mínimo criado por seed avança ticks; sem dependência gráfica; riscos web registrados, spike até N1 |
 | N1 — Física | Cosmos, Atmosphere, Geosphere, Hydrosphere integrados: dia/noite, chuva, temperatura, relevo, solos, água superficial em poças/depressões e saída de borda, infiltração/evaporação | conservação hídrica, resposta à chuva/seca, campos inspecionáveis, determinismo e primeira prova de save/load; conclusão do spike web ou bloqueio/inconclusivo documentado |
 | N2 — Botânica/Ecologia | 2 grupos vegetais, estados/biomassa/sementes, resposta água/luz/N, serapilheira e decompositores agregados | biomassa/ciclo de N auditáveis; plantas crescem e morrem em habitats distintos; save preserva novos estoques |
-| N3 — Fauna | herbívoro, predador, movimento, competição, consumo finito, metabolismo/custos, reprodução e morte | cadeias alimentares e retorno de detritos sem criação gratuita; cenário de extinção possível; save preserva fauna/agenda |
+| N3 — Fauna | herbívoro, predador, movimento, competição, consumo finito, metabolismo/custos, reprodução e morte | cadeia alimentar e retorno de detritos sem criação gratuita; cenário 40/4 em 3 seeds por 365 dias com balanços/saves válidos; seed 1 Release ≥20 dias simulados/s |
 | N4 — Visual/Integração | cliente MonoGame com técnica visual definida pelo gate, mundo procedural alinhado à referência, camadas de diagnóstico, pausa/velocidade, save/load, cenário persistente, demonstração de cadeia completa | gate integrado, critérios visuais e métricas CPU/GPU/FPS/RAM, reprodução por seed e documentação de limites e plataformas |
 
 ## Artefatos a cada marco
@@ -30,6 +30,8 @@ Usar o cenário versionado `temperate-valley-l0-v17` definido em [20_L0_MODEL_AN
 
 MonoGame é a stack obrigatória e não está em avaliação. Antes de fechar câmera e técnica visual, executar no cliente MonoGame a cena comparativa e os critérios de [direção visual e técnicas de apresentação](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md). Preservar N0–N3 e os contratos quantitativos; a validação pode ocorrer em paralelo à evolução científica. Se a prova atrasar, manter a técnica de apresentação em aberto e não redefinir parâmetros físicos ou biológicos para favorecer uma abordagem gráfica.
 
+**Checkpoint de 22/10/2026:** o benchmark N4 de 60 s desde o dia zero, com simulação ativa, passou nesta máquina. A comparação histórica 3D/híbrida nas duas projeções e a carga visual 10× também passaram as medições locais de 60 s, com câmera fixada durante a amostra. O usuário definiu árvores e objetos naturais como geometria 3D procedural; sprites e billboards de árvore estão fora da direção selecionada. N4 continua aberto: a malha 3D ainda não chega a 3/4 em todas as dimensões; hardware mínimo e outras plataformas não foram validados. Consulte o [relatório N4 de integração visual](reports/N4_VISUAL_INTEGRATION_2026-10-22.md).
+
 ## A primeira entrega não precisa incluir
 
 Maré lunar, glaciares, dinâmica de aquífero, solos multicamada, N/P/K completo, erosão geomorfológica complexa, oceanos, animais com redes neurais, genômica, dezenas de espécies, construções humanas e guerras. **Não criar código-esqueleto não exercitado** para sistemas adiados; documentos de capacidade opcional bastam.
@@ -37,6 +39,10 @@ Maré lunar, glaciares, dinâmica de aquífero, solos multicamada, N/P/K complet
 ## Realismo e incrementos futuros
 
 Aprofundar cada processo por perfil científico versionado (L0→L1→L2), preservando compatibilidade ou migrando explicitamente. Não aumentar todas as variáveis simultaneamente: escolher os elos causais cuja ampliação aumenta impacto observável no mundo.
+
+### Evolução futura de Zoology
+
+Após os marcos N0–N4, evoluir Zoology em módulos com gates independentes conforme o [plano modular de Zoology](specs/ZOOLOGY_MODULE_PLAN.md): baseline N3; espécie/plano corporal/genoma/desenvolvimento; anatomia/locomoção; fisiologia ecológica; pipeline visual derivado; herança/adaptação. Não iniciar a implementação completa desses módulos em paralelo. Cada gate precisa preservar o baseline N3 e demonstrar sua evidência antes de abrir o seguinte. As specs `ZOO-*` são propostas, não funcionalidades já entregues.
 
 ## Contenção da curva inicial
 

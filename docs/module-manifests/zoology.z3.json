@@ -1,0 +1,35 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Biosphere.Zoology",
+  "roadmapPhase": "Z3",
+  "gateStatus": "in-progress",
+  "scope": "dimensionally closed joule accounting integrated with L0 N3 intake, basal maintenance, energy-limited movement, and reserve consumption",
+  "ownedProcesses": [
+    "separate gross diet energy, assimilation, fecal loss, reserves, and joule-valued demands",
+    "report energy consumed, remaining reserve, and unmet demand without negative reserves",
+    "report unmet basal maintenance separately from aggregate demand shortfall",
+    "reserve basal maintenance energy before allowing movement and cap travel by the remaining activity budget",
+    "use the existing L0 dry-matter energy conversion to arbitrate N3 maintenance and movement consumption",
+    "report per-tick consumed, fecal, and unmet energy totals while keeping matter, nitrogen, and water ledgers separate"
+  ],
+  "ownedPersistentFields": [],
+  "providesCapabilities": [
+    "ICreatureEnergyBudgetV1"
+  ],
+  "coreMediatedInputs": [],
+  "scopeLimitations": [
+    "the model closes a budget but does not predict demand, intake, or assimilation efficiency",
+    "maintenance-first allocation and the 10 J/m activity cost are explicit L0 prototype policies, not universal or calibrated species physiology",
+    "the 18 kJ/g conversion and maintenance equations are inherited L0 engineering parameters, not calibrated species physiology",
+    "the energy reserve remains derived from persistent dry reserve mass; no separate joule field or world energy ledger exists",
+    "growth and reproduction allocation remain in the separate dry-matter model and are not calibrated as joule demands",
+    "this is not a Dynamic Energy Budget model"
+  ],
+  "validationPending": [
+    "recover the complete methods, units, and valid range for each selected reference population",
+    "select and calibrate a reference population, then replace inherited L0 energy and demand proxies with supported values",
+    "parameterize allocation policy and travel cost for a declared species/population and life stage",
+    "integrate growth and reproduction energy demands and validate starvation/reproduction against a declared profile",
+    "validate an aquatic organism against a declared profile"
+  ]
+}

@@ -8,6 +8,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Escopo e limites](00_SCOPE.md)
 - [Arquitetura e dependências](01_ARCHITECTURE.md)
 - [Domínios, módulos e submódulos](03_MODULES.md)
+- [Arquitetura de criaturas](architecture/CREATURE_ARCHITECTURE.md)
 - [Autoridade e propriedade do estado](04_OWNERSHIP.md)
 - [Contratos e evolução](05_CONTRACTS.md)
 - [Fluxos e conservação](06_FLUX_LEDGER.md)
@@ -19,6 +20,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Catálogo de especificações](specs/README.md)
 - [MVP físico](08_PHYSICAL_MVP.md)
 - [MVP biológico](09_BIOLOGICAL_MVP.md)
+- [Evolução modular de Zoology](specs/ZOOLOGY_MODULE_PLAN.md)
 - [Geração procedural](10_PROCEDURAL.md)
 - [Determinismo e save](11_DETERMINISM_AND_SAVES.md)
 - [Roadmap](12_ROADMAP.md)
@@ -26,6 +28,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Viabilidade de navegador](14_WEB_GATE.md)
 - [Pesquisa científica](15_RESEARCH.md)
 - [Síntese visual procedural do Consensus](research/consensus-procedural-flora.md)
+- [Pesquisa de criaturas procedurais](research/zoology/README.md)
 - [Legado e reutilização](16_LEGACY.md)
 - [Templates técnicos](17_TEMPLATES.md)
 
@@ -35,6 +38,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Physics](science/Physics.md)
 - [Chemistry](science/Chemistry.md)
 - [Biology](science/Biology.md)
+- [Morfogênese computacional e vida artificial](science/Biology/Morphogenesis-and-Artificial-Life.md)
 
 ## Revisão documental
 
@@ -46,6 +50,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Avaliação comparativa do protótipo MonoGame](reports/VISUAL_RENDERER_EVALUATION_2026-10-21.md)
 - [Avaliação do renderer, paleta guiada pelo snapshot e custo — iteração 19](reports/VISUAL_RENDERER_EVALUATION_ITERATION_19_2026-10-21.md)
 - [Avaliação do LOD de copa distante e desempenho — iteração 20](reports/VISUAL_RENDERER_EVALUATION_ITERATION_20_2026-10-21.md)
+- [N4 — evidência visual e integração MonoGame](reports/N4_VISUAL_INTEGRATION_2026-10-22.md)
 - [Variação vertical foliar e revisão da atribuição de arquétipos — iteração 21](reports/VISUAL_RENDERER_EVALUATION_ITERATION_21_2026-10-21.md)
 - [Shader de água, uso de GPU e cobertura visível — iteração 24](reports/VISUAL_RENDERER_EVALUATION_ITERATION_24_2026-10-21.md)
 - [Revisão da arquitetura dos galhos — iteração 38](reports/VISUAL_RENDERER_EVALUATION_ITERATION_38_2026-10-22.md)
@@ -57,3 +62,4 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Estrutura e suporte dos galhos — iteração 46](reports/PROCEDURAL_TREE_GROWTH_SUPPORT_ITERATION_46_2026-10-22.md)
 - [Arquitetura e curvatura dos galhos — iteração 47](reports/PROCEDURAL_TREE_BRANCH_SHAPE_ITERATION_47_2026-10-22.md)
 - [Esqueleto de galhos estável entre LODs — iteração 48](reports/PROCEDURAL_TREE_LOD_SCAFFOLD_ITERATION_48_2026-10-22.md)
+- [Fechamento da meta modular](reports/MODULE_GOAL_CLOSEOUT_2026-10-22.md)

@@ -58,12 +58,15 @@ public sealed class FluxLedgerState
     public double PlantTranspirationLiters { get; set; }
     public double WaterOutflowLiters { get; set; }
     public double PhotosynthesisDryGrams { get; set; }
+    public double AnimalRespirationDryGrams { get; set; }
+    public double AnimalExcretionWaterLiters { get; set; }
     public double DetritusRespirationDryGrams { get; set; }
     public double SoilOrganicMatterRespirationDryGrams { get; set; }
 
     public FluxLedgerSnapshot Snapshot() => new(
         PrecipitationLiters, InterceptionLiters, OpenWaterEvaporationLiters, SoilEvaporationLiters,
         PlantTranspirationLiters, WaterOutflowLiters, PhotosynthesisDryGrams,
+        AnimalRespirationDryGrams, AnimalExcretionWaterLiters,
         DetritusRespirationDryGrams, SoilOrganicMatterRespirationDryGrams);
 }
 
@@ -75,13 +78,16 @@ public readonly record struct FluxLedgerSnapshot(
     double PlantTranspirationLiters,
     double WaterOutflowLiters,
     double PhotosynthesisDryGrams,
+    double AnimalRespirationDryGrams,
+    double AnimalExcretionWaterLiters,
     double DetritusRespirationDryGrams,
     double SoilOrganicMatterRespirationDryGrams);
 
 public sealed class SimulationState
 {
-    public const int Width = 256;
-    public const int Height = 256;
+    public const int CurrentSchemaVersion = 3;
+    public const int Width = 64;
+    public const int Height = 64;
     public const double CellAreaM2 = 100.0;
     public const long TicksPerHour = 6;
     public const long TicksPerDay = 144;
@@ -89,28 +95,33 @@ public sealed class SimulationState
     public ulong Seed { get; set; }
     public long TickIndex { get; set; }
     public WorldCell[] Cells { get; set; } = [];
+    public AnimalAgentV1[] Animals { get; set; } = [];
+    public ulong NextAnimalId { get; set; } = 1;
     public int[] ClimateHoursSinceRain { get; set; } = new int[16];
     public ClimateHour[] CurrentDayWeather { get; set; } = [];
     public int CurrentWeatherDay { get; set; } = -1;
     public FluxLedgerState Ledger { get; set; } = new();
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 }
 
 public sealed class WorldSnapshot
 {
     private readonly IReadOnlyList<WorldCell> _cells;
+    private readonly IReadOnlyList<AnimalAgentV1> _animals;
 
-    public WorldSnapshot(ulong seed, long tickIndex, WorldCell[] cells, FluxLedgerState ledger)
+    public WorldSnapshot(ulong seed, long tickIndex, WorldCell[] cells, AnimalAgentV1[] animals, FluxLedgerState ledger)
     {
         Seed = seed;
         TickIndex = tickIndex;
         _cells = Array.AsReadOnly((WorldCell[])cells.Clone());
+        _animals = Array.AsReadOnly((AnimalAgentV1[])animals.Clone());
         Ledger = ledger.Snapshot();
     }
 
     public ulong Seed { get; }
     public long TickIndex { get; }
     public IReadOnlyList<WorldCell> Cells => _cells;
+    public IReadOnlyList<AnimalAgentV1> Animals => _animals;
     public FluxLedgerSnapshot Ledger { get; }
     public int Width => SimulationState.Width;
     public int Height => SimulationState.Height;
