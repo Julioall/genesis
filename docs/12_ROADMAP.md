@@ -10,6 +10,13 @@ Os marcos N0–N4 são **internos**. Só declare **MVP Natural aprovado** quando
 | N3 — Fauna | herbívoro, predador, movimento, competição, consumo finito, metabolismo/custos, reprodução e morte | cadeia alimentar e retorno de detritos sem criação gratuita; cenário 40/4 em 3 seeds por 365 dias com balanços/saves válidos; seed 1 Release ≥20 dias simulados/s |
 | N4 — Visual/Integração | cliente MonoGame com técnica visual definida pelo gate, mundo procedural alinhado à referência, camadas de diagnóstico, pausa/velocidade, save/load, cenário persistente, demonstração de cadeia completa | gate integrado, critérios visuais e métricas CPU/GPU/FPS/RAM, reprodução por seed e documentação de limites e plataformas |
 
+## Estado dos gates em 22/10/2026
+
+- **N0–N3:** gates do cenário L0 marcados como validados nos relatórios atuais. A prova N3 cobre três seeds anuais e throughput headless; ela não fecha os critérios visuais do produto nem implica estabilidade populacional. Consulte [Zoology/N3](reports/ZOOLOGY_N3_2026-10-22.md).
+- **N4:** cliente MonoGame, simulação integrada e captura/benchmark existem. As janelas locais de desempenho passaram; a rubrica visual não passou, e máquina mínima/plataformas adicionais não foram validadas. N4 permanece aberto; consulte [integração visual N4](reports/N4_VISUAL_INTEGRATION_2026-10-22.md).
+- **Z1–Z5:** subgates técnicos de zoologia já começaram e produziram protótipos versionados; não são gates completos de espécie ou ecologia calibradas. Os resultados e pendências estão no [índice de baselines](reports/README.md).
+- **Lacunas de produto:** enchimento/extravasamento de lago e carcaça animal persistente continuam pendentes. Não usar a existência de um teste de conservação para declarar essas experiências concluídas.
+
 ## Artefatos a cada marco
 
 Antes de implementar um processo, fechar sua ficha quantitativa usando [20_L0_MODEL_AND_BENCHMARKS.md](20_L0_MODEL_AND_BENCHMARKS.md) como contrato numérico único do cenário L0. Equações, parâmetros, tolerâncias e metas não podem divergir entre domínio, testes e desempenho.
@@ -34,7 +41,7 @@ MonoGame é a stack obrigatória e não está em avaliação. Antes de fechar c�
 
 ## A primeira entrega não precisa incluir
 
-Maré lunar, glaciares, dinâmica de aquífero, solos multicamada, N/P/K completo, erosão geomorfológica complexa, oceanos, animais com redes neurais, genômica, dezenas de espécies, construções humanas e guerras. **Não criar código-esqueleto não exercitado** para sistemas adiados; documentos de capacidade opcional bastam.
+Maré lunar, glaciares, dinâmica de aquífero, solos multicamada, N/P/K completo, erosão geomorfológica complexa, oceanografia, animais com redes neurais, genômica populacional validada, dezenas de espécies, construções humanas e guerras. **Não criar código-esqueleto não exercitado** para sistemas adiados; documentos de capacidade opcional bastam.
 
 ## Realismo e incrementos futuros
 
@@ -42,10 +49,25 @@ Aprofundar cada processo por perfil científico versionado (L0→L1→L2), prese
 
 ### Evolução futura de Zoology
 
-Após os marcos N0–N4, evoluir Zoology em módulos com gates independentes conforme o [plano modular de Zoology](specs/ZOOLOGY_MODULE_PLAN.md): baseline N3; espécie/plano corporal/genoma/desenvolvimento; anatomia/locomoção; fisiologia ecológica; pipeline visual derivado; herança/adaptação. Não iniciar a implementação completa desses módulos em paralelo. Cada gate precisa preservar o baseline N3 e demonstrar sua evidência antes de abrir o seguinte. As specs `ZOO-*` são propostas, não funcionalidades já entregues.
+Zoology evolui por gates independentes conforme o [plano modular](specs/ZOOLOGY_MODULE_PLAN.md): baseline N3; espécie/plano corporal/genoma/desenvolvimento; anatomia/locomoção; fisiologia ecológica; pipeline visual; herança/adaptação. Os protótipos Z1–Z5 já iniciados têm entregas parciais descritas nos respectivos relatórios; suas specs continuam contendo trabalho proposto. Não iniciar todas as extensões em paralelo. Cada gate deve preservar o baseline N3, separar inferência de treinamento/evolução e demonstrar a evidência específica antes de ser declarado concluído. Esses subgates podem avançar sem declarar N4 visual aprovado.
 
 ## Contenção da curva inicial
 
 N0 é boot determinístico sequencial com contratos usados e teste pequeno, não framework extensível completo. Desktop placeholder não é gate de N0; criar projeto de cada adaptador só ao usá-lo. Save/load deve ter uma prova pequena em N1 e acompanhar novos estoques em N2/N3, evitando descoberta tardia em N4. Medições gráficas começam quando há cliente; N0 mede apenas headless. O spike web tem orçamento máximo proposto de um dia de trabalho; ao exceder, registrar resultado inconclusivo/bloqueio e continuar desktop. Ele não exige implementar segundo cliente completo nem cumprir benchmarks finais em N0.
 
 Antes de ampliar a escala proposta em [escopo](00_SCOPE.md), comprovar o cenário finito com cadeia completa. Mudanças de fidelidade ou infraestrutura precisam indicar qual gate bloqueado resolvem e custo; sem essa justificativa ficam no backlog. Não retirar fauna ou decomposição para declarar MVP concluído.
+
+## Próximas entregas incrementais recomendadas
+
+Esta sequência traduz as propostas do relatório ecológico para o roadmap N0–N4 existente. Cada PR deve continuar pequeno e fechar seu próprio gate.
+
+| PR | Entrega | Dependência e gate |
+|---|---|---|
+| A — alinhamento documental | README, escala, estado executável, ADR de fidelidade seletiva, índice de evidências e estados implementado/parcial/ausente | Registrado neste passe documental; conferir links e manter os relatos históricos rotulados |
+| B — observabilidade ambiental | Estado/eventos recentes para água, biomassa, mortalidade e causas, sem histórico por célula a cada tick | Owners publicam transições; inspeção reproduzível e custo de memória medido |
+| C — lagos e vazão | Fluxo por aresta e reservatório com estágio, soleira, enchimento e extravasamento conservativo | H0–H4 em [hidrologia](specs/HYDROLOGY.md); EX-01/02 e água visual derivada do snapshot |
+| D — resposta vegetal | Avaliar estresse hídrico persistente e coortes compactas somente se fixtures mostrarem que patches atuais não distinguem seca, morte e regeneração | EX-03 em múltiplos regimes hídricos; árvores mortas nunca reaparecem sem regeneração |
+| E — fechamento zoológico | Fechar lacunas abertas de movimento, energia, observabilidade e limites por perfil sem alterar o baseline N3 silenciosamente | Subgates Z2/Z3; EX-04/05, save/load, balanços e throughput registrados |
+| F — carcaça persistente | Criar recurso com ID, massa/N restantes, consumo concorrente, decomposição, restos e save/load | Owner e ledger aprovados; EX-06/08 sem duplicação; estágio visual deriva do estado |
+| G — experiência integrada e perfil | Sequências multi-seed de meses simulados, inspeção, capturas e profiling headless/render em separado | EX-07/10, custo de CPU/RAM/VRAM e gates N4; documentar limites do hardware |
+| H — política neural (opcional) | Comparar uma política de inferência compartilhada a heurísticas em arena reproduzível; treinamento e evolução são experiências separadas | Só abrir depois do baseline observável; EX-11 e ganho comportamental/custo demonstrados |

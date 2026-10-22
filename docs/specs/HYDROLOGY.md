@@ -1,6 +1,6 @@
 # Hidrologia do mundo L0
 
-> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
+> Os registros de relevo v16 e hidrologia v17 descrevem experimentos avaliados em 21/10/2026. O código relacionado está incluído no checkout atual; as medições continuam vinculadas aos builds/cenas históricos e não foram reexecutadas nesta revisão. Consulte o [índice atual de evidências](../reports/README.md).
 
 **Status:** H0 começou; Priority-Flood, caminhos potenciais e curvas de armazenamento de depressões estão implementados para a grade L0. O solver de água em movimento ainda é o modelo anterior e não deve ser descrito como validado hidrodinamicamente.
 

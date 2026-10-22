@@ -26,6 +26,8 @@ Cor deve comunicar espécie, ambiente ou condição observável, e não ser esco
 
 O snapshot atual publica biomassa de gramíneas e lenhosas por célula, mas não a identidade de cada espécie vegetal. Até essa identidade existir, tons fixos por arquétipo são apenas hipóteses estilizadas apoiadas por descritores documentados; não são estados taxonômicos. Variação cromática por seed, estação, seca ou doença precisa de uma causa publicada e de um traço de espécie compatível. O material do terreno pode representar substrato, elevação, inclinação e umidade presentes no snapshot. Uma máscara visual de aridez por seed não deve classificar o clima como deserto nem alterar a presença de organismos; essa classificação espera dados ambientais apropriados.
 
+Da mesma forma, costa, praia ou mar desenhados pelo cliente são conteúdo de apresentação: o runtime atual não modela um domínio oceânico nem um ciclo hídrico marinho. As cinco formas arbóreas e os protótipos de criatura também não devem ser lidos automaticamente como espécies ecológicas; cor, silhueta ou malha só comunicam diferenças que o estado publicado sustenta.
+
 O céu procedural foi removido da apresentação atual porque a faixa visível não combinava com a composição elevada desejada. Nuvens e chuva ficam para a implementação do clima: em uma vista distante, nuvens poderão ser desenhadas quando houver estado atmosférico publicado; em uma vista próxima, sua passagem poderá ser percebida por sombras coerentes no terreno. Sem esse estado, o renderer não inventa tempo meteorológico. A navegação permite aproximação até a escala da vegetação rasteira; insetos e aranhas só serão acrescentados quando a fauna simulada os publicar.
 
 ## Diretriz visual aprovada

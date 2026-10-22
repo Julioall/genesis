@@ -54,7 +54,7 @@ Cada teste registra `build`, `worldSeed`, `scenarioVersion`, parâmetros complet
 | T24 | cadências diferentes e chuva horária | cada janela de fluxo é consumida uma vez; save preserva próxima execução |
 | T25 | escala espacial, movimento e estado inválido | mm × área converte para litros; velocidade respeita distância/tempo; NaN/Infinity rejeitados |
 
-Esses são critérios para a implementação futura. Na revisão documental de 20/10/2026 só se verificaram coerência, referências locais e cobertura de requisitos; os resultados efetivamente executados depois estão registrados na seção abaixo.
+Esses critérios foram originalmente definidos como gates futuros. Os resultados executados desde então e as lacunas ainda abertas estão registrados na seção de evidência e no índice de relatórios abaixo.
 
 ## Aplicação incremental dos gates
 
@@ -62,10 +62,27 @@ N0 verifica boot, pausa, dependências e determinismo do estado mínimo. N1 exer
 
 No cenário integrado T18, declarar antes da execução duração, ticks, seeds, estoques iniciais e quais elos causais devem ser observados. A duração deve permitir demonstrar crescimento, consumo, morte e reciclagem, com reprodução verificada nos cenários próprios. Extinção explicada pode passar; uma população que desaparece antes de exercitar a cadeia torna essa demonstração inconclusiva, sem autorizar respawn corretivo.
 
-## Evidência executada nesta branch
+## Estado das evidências em 22/10/2026
 
-O escopo implementado é N0–N2, sem fauna. `dotnet build Game.sln -c Release` compila runner, módulos, cliente DesktopGL e testes. `dotnet test Game.sln -c Release` cobre o vetor RNG L0, repetibilidade e partição de ticks, snapshot imutável, geometria solar, chuva/solo saturado, escoamento D8, crescimento limitado por luz/água/N, decomposição e conservação de massa/N, continuação após save/load no meio do dia e cadência diária. Os casos futuros T09–T11 e a parte animal de T19–T21 permanecem fora do escopo e não foram executados.
+- **N0–N3:** implementados; o relatório N3 registra o cenário 40/4, três seeds por 365 dias, conservação de água/matéria/N, save/load determinístico e throughput headless dentro do gate. A cadeia alimentar é observável no primeiro dia; populações finais não são alvo de equilíbrio. Consulte [Zoology/N3](reports/ZOOLOGY_N3_2026-10-22.md).
+- **Z1–Z5:** há entregas técnicas parciais com limites próprios. Genomas/linhagem não dirigem a ecologia; locomoção e energia não estão calibradas por espécie; corpo e peixe são protótipos visuais. Consulte os relatórios no [índice de baselines](reports/README.md).
+- **N4:** cliente e renderer estão implementados. Benchmarks de 60 s passaram na máquina documentada, mas a rubrica visual não passou; hardware mínimo, outras plataformas e integração visual completa continuam pendentes. A cachoeira demonstrativa é fixture de apresentação, não resultado hidráulico. Consulte [N4 — integração visual](reports/N4_VISUAL_INTEGRATION_2026-10-22.md).
+- **Lacunas ecológicas:** lago com estágio/extravasamento dinâmico e carcaça persistente ainda não existem. A morte é transferida para detritos agregados; por isso, o teste de carcaça abaixo permanece um gate futuro.
 
-Smoke runs adicionais avançaram seeds 1, 2 e 3 por 52.560 ticks cada. Isso evidencia execução longa e terminações finitas para essas seeds; não substitui a instrumentação completa de T01–T25 nem validação de campo. Os 19 testes Release também cobrem a variação real de elevação na malha, a continuidade de bordas entre chunks, a geometria dos afloramentos, a drenagem e a distribuição determinística de flora. Na revisão ecológica v13, seeds 1–3 avançaram até o tick 144 e fecharam água, matéria seca e N dentro das tolerâncias registradas em [20_L0_MODEL_AND_BENCHMARKS](20_L0_MODEL_AND_BENCHMARKS.md).
+## Gatilhos de experiência ainda a fechar
 
-A build Release do cliente foi aberta e respondeu com o título `Temperate Valley (L0)`. A captura `genesis-flora-v17-highland-forest.png` e a medição de 60 s estão fora do repositório no diretório de visualizações do Codex; seed 1, 1280 × 720, aquecimento de 5 s: 3541 quadros, média 59.02 FPS, P95 17.20 ms, P99 45.80 ms, CPU 58.2% de um núcleo e working set 181.5 MiB. A imagem mostra a geometria e os bosques ampliados, mas ainda não alcança a densidade vegetal nem as margens de rio da referência.
+Estes gates complementam conservação e testes unitários: exigem uma sequência de snapshots/eventos que torne a cadeia causal legível. Não se marcam como concluídos só porque um teste isolado de função passou.
+
+| ID | Experimento observável | Estado neste checkout |
+|---|---|---|
+| EX-01 | Bacia sob chuva: volume, estágio, soleira e extravasamento | Pendente: topologia e curva de armazenamento existem; lago dinâmico/extravasamento não |
+| EX-02 | Recarga seguida de estiagem, com transição gradual de água e habitat | Parcial: clima, solo e superfície variam; não há reservatório de lago dinâmico |
+| EX-03 | Perfis vegetais contrastantes sob seca e reidratação, sem ressuscitar árvores | Parcial: biomassa responde à água; estresse persistente/coortes e estado visual de morte não existem |
+| EX-04 | Herbívoros buscam água/alimento e movimento respeita obstáculos amostrados | Parcial: comportamento N3 e solver terrestre existem; limites/calibração por espécie permanecem abertos |
+| EX-05 | Predação concorrente abate/consome uma presa no máximo uma vez | Validado no escopo N3; detalhes em [Zoology/N3](reports/ZOOLOGY_N3_2026-10-22.md) |
+| EX-06 | Acesso de carniceiros acelera consumo e deixa restos/ossada persistentes | Pendente: não há entidade `Carcass` |
+| EX-07 | Seca prolongada encadeia recursos, plantas e populações sem resgate artificial | Parcial: cenários anuais foram validados; falta aceite visual/causal de seca e recuperação |
+| EX-08 | Save/load durante cheia e após morte preserva continuação e IDs | Parcial: continuidade N3 validada; cheia de lago e carcaça persistente ausentes |
+| EX-09 | Câmera/LOD diferentes preservam o hash científico | Parcial: separação visual/lógica está coberta; validação integrada de todos os LODs ainda falta |
+| EX-10 | Seeds 1–3 por 365 dias mostram histórias diversas e explicáveis | Parcial: balanços e trajetórias estão documentados; extinções anuais limitam histórias posteriores |
+| EX-11 | Política heurística versus neural nas mesmas condições | Opcional futuro; não é requisito de N3/N4 |

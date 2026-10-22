@@ -43,6 +43,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 ## Revisão documental
 
 - [Resultado da revisão e limites do parecer](18_DOCUMENT_REVIEW.md)
+- [Fidelidade ecológica seletiva](decisions/ADR-0007-selective-ecological-fidelity.md)
 - [Regras de codificação](19_CODING_RULES.md)
 - [Modelos L0, equações, parâmetros e metas](20_L0_MODEL_AND_BENCHMARKS.md)
 - [Terreno geométrico e protótipo atual](21_GEOMETRIC_TERRAIN.md)
@@ -51,6 +52,7 @@ O conteúdo deste diretório orienta decisões e implementações. **`docs/scien
 - [Avaliação do renderer, paleta guiada pelo snapshot e custo — iteração 19](reports/VISUAL_RENDERER_EVALUATION_ITERATION_19_2026-10-21.md)
 - [Avaliação do LOD de copa distante e desempenho — iteração 20](reports/VISUAL_RENDERER_EVALUATION_ITERATION_20_2026-10-21.md)
 - [N4 — evidência visual e integração MonoGame](reports/N4_VISUAL_INTEGRATION_2026-10-22.md)
+- [Índice de baselines, gates e evidências](reports/README.md)
 - [Variação vertical foliar e revisão da atribuição de arquétipos — iteração 21](reports/VISUAL_RENDERER_EVALUATION_ITERATION_21_2026-10-21.md)
 - [Shader de água, uso de GPU e cobertura visível — iteração 24](reports/VISUAL_RENDERER_EVALUATION_ITERATION_24_2026-10-21.md)
 - [Revisão da arquitetura dos galhos — iteração 38](reports/VISUAL_RENDERER_EVALUATION_ITERATION_38_2026-10-22.md)

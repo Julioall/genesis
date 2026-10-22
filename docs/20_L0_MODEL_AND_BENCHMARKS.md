@@ -1,8 +1,8 @@
 # Modelos L0, parâmetros, tolerâncias e metas de desempenho
 
-> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
+> A implementação C#/.NET 10 correspondente a este cenário está incluída no checkout atual. Os benchmarks abaixo são registros históricos ligados a builds, commits, seeds, resoluções e hardware próprios; não são garantias gerais. O experimento de 256 × 256 do commit auditado `c6aecbc` deve ser separado do cenário canônico de 64 × 64 usado pelo checkout `dd2cf47`.
 
-**Status:** contrato do cenário implementado e evidência por revisão; não é calibração ecológica. **Escopo:** mapa finito do MVP e processos necessários para clima, água, duas plantas funcionais, herbívoro, predador e decomposição. A física atmosférica, a fisiologia e os comportamentos são aproximações transparentes de jogo.
+**Status:** contrato quantitativo L0 do runtime; N0–N3 têm validação documentada, enquanto N4 permanece aberto. Estes parâmetros não são calibração ecológica de campo. **Escopo:** mapa finito e processos necessários para clima, água, dois grupos vegetais, perfis funcionais de herbívoro/predador e decomposição. A física atmosférica, a fisiologia e os comportamentos são aproximações transparentes de jogo.
 
 As métricas gráficas históricas deste documento descrevem builds do cliente MonoGame e são evidência do protótipo nesta máquina. Elas não comparam técnicas nem aprovam a direção visual final. O gate de apresentação compara as técnicas na mesma cena, máquina e metas dentro do MonoGame, conforme [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md). Não alterar os contratos ou parâmetros científicos para otimizar uma comparação de renderer.
 

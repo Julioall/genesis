@@ -1,6 +1,6 @@
 # Arquitetura procedural da flora 3D — protótipo atual
 
-> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
+> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem experimentos avaliados em 21/10/2026. O código relacionado está incluído no checkout atual; as medições continuam vinculadas aos builds/cenas históricos e não foram reexecutadas nesta revisão. Consulte o [índice atual de evidências](../reports/README.md).
 
 Pesquisa comparativa: [referências de geração procedural de árvores — iteração 43](../reports/PROCEDURAL_TREE_REPOSITORY_RESEARCH_ITERATION_43_2026-10-22.md). Evolução das junções: [iteração 44](../reports/PROCEDURAL_TREE_BRANCH_JUNCTIONS_ITERATION_44_2026-10-22.md).
 

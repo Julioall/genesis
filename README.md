@@ -1,49 +1,49 @@
-# Natural World L0
+# Genesis — simulador observacional de um mundo natural
 
-> Publicação documental: o runtime N0–N2, os comandos de execução e os resultados descritos referem-se à implementação local. Esta branch publica apenas documentação; os projetos C# ainda não estão incluídos nela.
+Genesis é um simulador determinístico em C#/.NET 10, com núcleo headless e cliente desktop MonoGame. A proposta é que o jogador crie um mundo por seed, acompanhe água, vegetação e fauna, controle o tempo e entenda as causas dos acontecimentos. O cliente atual oferece pausa, aceleração, navegação e inspeção de snapshots; histórico explicativo de eventos ainda é uma meta. A simulação é proprietária do estado; a apresentação lê snapshots.
 
-Implementação incremental em C#/.NET com núcleo headless e um cliente desktop MonoGame. Este repositório implementa a base determinística (N0), o cenário físico L0 (N1) e patches de gramíneas/lenhosas com sementes e decomposição agregada (N2), além de uma janela mínima para inspecionar o mundo.
+## Estado deste checkout
 
-MonoGame é a stack obrigatória do cliente. A direção visual e o gate para comparar técnicas de apresentação dentro do MonoGame estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY](docs/22_VISUAL_DIRECTION_AND_TECHNOLOGY.md) e [ADR-0004](docs/decisions/ADR-0004-visual-direction-and-renderer-evaluation.md).
+Este checkout inclui código e documentação. Nos registros de 22/10/2026, N0–N3 estão implementados e seus gates L0 foram validados. O cliente e a integração N4 existem, mas a avaliação visual continua aberta: desempenho foi medido nesta máquina, enquanto a rubrica visual ainda não atingiu o aceite. Portanto, o MVP Natural completo ainda não está aprovado. Consulte o [índice de baselines e evidências](docs/reports/README.md) e o [roadmap](docs/12_ROADMAP.md).
 
-**Esta etapa não implementa fauna e não declara o MVP natural completo.** Herbívoros e predadores continuam descritos como escopo futuro nos documentos do projeto; não há entidades, classes ou processos animais no runtime desta entrega.
+O cenário canônico usa **64 × 64 células**, cada uma com **100 m²** (células de 10 m por lado), e ticks de 10 minutos. O commit auditado `c6aecbc` usou uma grade experimental de 256 × 256; o checkout atual `dd2cf47` voltou à grade canônica de 64 × 64. Resultados desses dois tamanhos não são comparáveis sem identificar cenário e commit.
+
+## O que está implementado
+
+- Mundo ambiental determinístico com calendário, geometria solar, clima prescrito, relevo, solos, água superficial e subterrânea, infiltração, evaporação e roteamento conservativo.
+- Gramíneas e plantas lenhosas em patches, crescimento condicionado por luz, água e nitrogênio, sementes, senescência e reciclagem agregada.
+- Zoology L0 com perfis funcionais de herbívoro e predador, IDs persistentes, busca local, movimento, consumo finito, metabolismo, hidratação, predação, reprodução, mortalidade e transferências de matéria, nitrogênio e água.
+- Cenário headless `--n3-scenario` com 40 herbívoros e 4 predadores. A evidência registrada cobre três seeds por 365 dias, conservação e continuação por save/load.
+- Saves JSON versionados, snapshots de leitura e cliente MonoGame com relevo e flora procedurais, câmera, inspeção, pausa, aceleração e ferramentas de avaliação.
+- Protótipos zoológicos Z1–Z5 de genoma, desenvolvimento, locomoção, energia e geometria visual. Eles não equivalem a espécies calibradas nem fazem anatomia/genética controlar a ecologia N3; veja os relatórios Z em `docs/reports/`.
+
+## Limites importantes
+
+- A Hydrosphere calcula topologia de bacias e roteia água superficial, mas ainda não simula lagos como reservatórios que sobem até a soleira e extravasam. Uma superfície ou cachoeira de apresentação não comprova fluxo hidrológico simulado.
+- As plantas continuam agregadas por patches. As formas arbóreas do renderer são arquétipos visuais; não representam cinco espécies ou populações ecológicas distintas.
+- Mortes animais transferem matéria para detritos agregados. Ainda não há entidade persistente de carcaça, consumo posterior por carniceiros ou ossada visível.
+- O domínio não modela um oceano. Qualquer costa ou mar desenhado pertence à apresentação e não representa um ciclo hídrico oceânico.
+- Parâmetros L0 são heurísticos, não calibração de campo. Não há política neural obrigatória nem treinamento on-line de animais.
 
 ## Executar
 
-Requer .NET SDK 10.0. O núcleo e o runner não dependem de MonoGame.
+Requer o .NET SDK 10.0.
 
 ```powershell
 dotnet restore Game.sln
 dotnet build Game.sln -c Release
 dotnet test Game.sln -c Release
-dotnet run --project src/Game.App/Game.App.csproj -c Release -- --seed 1 --ticks 1440 --save world.json
+dotnet run --project src/Game.App/Game.App.csproj -c Release -- --seed 1 --ticks 144 --save world.json
 dotnet run --project src/Game.App/Game.App.csproj -c Release -- --load world.json --ticks 144
-dotnet run --project src/Game.Client.Desktop/Game.Client.Desktop.csproj -c Release
-dotnet run --project src/Game.Client.Desktop/Game.Client.Desktop.csproj -c Release -- --visual-evaluation --projection perspective --seed 2
+dotnet run --project src/Game.App/Game.App.csproj -c Release -- --n3-scenario --seed 1 --ticks 52560 --save n3-seed-1.json
+dotnet run --project src/Game.Client.Desktop/Game.Client.Desktop.csproj -c Release -- --seed 1
 ```
 
-O runner local usa `temperate-valley-l0-v17`, seed 1 por padrão e ticks de 10 minutos. A janela começa a 6 ticks simulados por segundo. Teclas `1/2/3` alternam o fundo entre relevo, água do solo e biomassa; `Space` pausa; `+/-` muda a velocidade; `F5/F9` salva/carrega em `%LOCALAPPDATA%/Game/natural-world-save.json`. Passe o mouse sobre uma célula para inspecionar seus campos.
+O cliente aceita `--visual-evaluation` para inspeção e captura. Os parâmetros de câmera, snapshots, benchmark e as evidências reproduzíveis estão descritos no [relatório de integração N4](docs/reports/N4_VISUAL_INTEGRATION_2026-10-22.md). O runner usa `temperate-valley-l0-v17` por padrão; o cenário N3 é opt-in.
 
-O modo `--visual-evaluation` abre uma composição do snapshot, pausada por padrão, com câmera ortográfica ou perspectiva (`C` alterna). Na vista `--reference-landscape-view`, o zoom inicial é 125%; `--camera-zoom 1` mostra a ilha inteira. `--camera-focus 1800 1500` define o foco inicial em metros nos eixos leste/norte; `Home` retorna a esse foco. Use a roda do mouse ou `Page Up`/`Page Down` para aproximar e afastar, arraste com qualquer botão do mouse para navegar e use as setas para deslocar o foco. O zoom pela roda mantém o ponto sob o cursor. `--seed 2` mostra outra composição de água e bosque. `W` alterna as fixtures de curso e cachoeira. `--snapshot-water-only` começa sem elas para inspecionar a água do snapshot. `Space` retoma a simulação. Capturas, rubrica e desempenho estão nos [relatórios de avaliação MonoGame](docs/reports/).
+## Documentação principal
 
-## O que está implementado
-
-- Geração determinística 64×64 por seed, calendário, geometria solar, temperatura, chuva por zona, relevo, perfis de solo, infiltração, água superficial, evaporação, escoamento de borda e respectivos fluxos de água.
-- Gramíneas e plantas lenhosas por patch/célula, crescimento horário condicionado a PAR, água e N, banco/dispersão/germinação de sementes, senescência, detritos e mineralização/decomposição diária.
-- Livro agregado para água, matéria seca equivalente e N; snapshots de leitura para a apresentação; save/load JSON com validação básica e continuação determinística.
-- Malha atual com altitude geométrica, chunks contínuos e afloramentos com paredes laterais; a cobertura vegetal e os rios continuam ligados ao snapshot físico. O registro dessa implementação é histórico e não fixa a representação final.
-- Imagens procedurais em memória para terreno, pedras, gramíneas, troncos e folhas sazonais. A aparência usa uma seed visual separada e não altera a simulação. Nenhum pack de imagens é obrigatório.
-
-Os números e as simplificações são os parâmetros heurísticos L0 documentados; não representam calibração de campo. Consulte [equações, limites e metas](docs/20_L0_MODEL_AND_BENCHMARKS.md), [pesquisa e decisões visuais](docs/15_RESEARCH.md) e [roadmap](docs/12_ROADMAP.md).
-
-## Estrutura e documentação
-
-- [Índice dos documentos](docs/README.md)
-- [Direção visual e avaliação tecnológica](docs/22_VISUAL_DIRECTION_AND_TECHNOLOGY.md)
-- [Avaliação comparativa do protótipo MonoGame](docs/reports/VISUAL_RENDERER_EVALUATION_2026-10-21.md)
-- [Protótipo de terreno atual](docs/21_GEOMETRIC_TERRAIN.md)
-- [Arquitetura e marcos](docs/01_ARCHITECTURE.md) · [ADR-0001](docs/decisions/ADR-0001-Science-Is-Documentation.md) · [ADR-0002](docs/decisions/ADR-0002-L0-runtime-and-presentation.md) · [ADR-0004](docs/decisions/ADR-0004-visual-direction-and-renderer-evaluation.md)
-- [Síntese visual do Consensus](docs/research/consensus-procedural-flora.md)
-- [Plano de testes](docs/13_TESTS.md)
-
-O código não depende de `../Spectators-of-Life`. O checkout legado foi tratado somente como referência de leitura; os algoritmos e assets daquela árvore não foram copiados.
+- [Índice da documentação](docs/README.md) · [visão de produto](docs/GDD.md) · [escopo](docs/00_SCOPE.md)
+- [Modelo biológico e estado de implementação](docs/09_BIOLOGICAL_MVP.md) · [roadmap](docs/12_ROADMAP.md)
+- [Modelo L0 e benchmarks](docs/20_L0_MODEL_AND_BENCHMARKS.md) · [direção visual MonoGame](docs/22_VISUAL_DIRECTION_AND_TECHNOLOGY.md)
+- [Índice de baselines e relatórios](docs/reports/README.md) · [decisões arquiteturais](docs/decisions/README.md)

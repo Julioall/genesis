@@ -1,6 +1,6 @@
 # Terreno geométrico e protótipo visual atual
 
-> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos do diretório de trabalho local em 21/10/2026. O código dessas alterações não integra esta publicação documental; os resultados históricos não foram reexecutados nesta revisão.
+> Os registros de relevo v16, hidrologia v17 e flora 3D descrevem protótipos avaliados em 21/10/2026. O código relacionado está incluído no checkout atual, mas as medições e conclusões abaixo continuam vinculadas aos builds e cenas históricos; confira o [índice atual de evidências](reports/README.md).
 
 **Status:** histórico técnico do terreno e do cliente existente. MonoGame permanece a stack obrigatória; as especificações de câmera, sprites e projeção abaixo descrevem protótipos anteriores, não requisitos para a apresentação final. A nova direção e a avaliação de técnicas dentro do MonoGame estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md) e [ADR-0004](decisions/ADR-0004-visual-direction-and-renderer-evaluation.md).
 
