@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Biosphere",
+  "roadmapPhase": "N2",
+  "gateStatus": "validated",
+  "scope": "L0 botany and aggregate ecology",
+  "ownedProcesses": [
+    "plant-patch growth, seed production, and dispersal",
+    "plant mortality, germination, litter, and aggregate decomposition"
+  ],
+  "ownedPersistentFields": [
+    "Grass",
+    "Woody",
+    "DetritusDryGPerM2",
+    "DetritusNitrogenGPerM2",
+    "botany daily response accumulators"
+  ],
+  "providesCapabilities": [
+    "IBotanyV1",
+    "IEcologyV1"
+  ],
+  "coreMediatedInputs": [
+    "air temperature and surface shortwave from Cosmos/Atmosphere/Geosphere",
+    "available soil and surface water",
+    "mineral nitrogen and soil biogeochemistry observations"
+  ],
+  "ownerProposals": [
+    "plant transpiration and mineral-nitrogen stock after plant growth",
+    "soil organic matter and nitrogen stocks after decomposition"
+  ],
+  "validationPending": []
+}

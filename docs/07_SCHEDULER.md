@@ -11,7 +11,7 @@ Evitar resolver uma realimentação recursiva imediatamente por chamadas mútuas
 
 | Fase | Escrever/confirmar | Informações lidas |
 |---|---|---|
-| 0 | Cosmos: instante e geometria solar | calendário anterior |
+| 0 | Core: avança tick e determina dia/janela; Cosmos: calcula a amostra de geometria solar solicitada | estado temporal anterior |
 | 1 | Atmosphere: tempo e precipitação | sol + campos ambientais anteriores, como cobertura |
 | 2 | Biosphere.Botany: interceptação/demanda potencial; Geosphere/Hydro: distribuição de chuva | temperatura, chuva, cobertura prévia |
 | 3 | Geosphere.Soil: infiltração/solo; Hydrosphere: escoamento/rios | reservas e propostas no mesmo snapshot de fase |
@@ -33,6 +33,10 @@ Esse esquema é conceitual. A implementação pode separar chuva em subpassos e 
 - Reproduções/populações: por evento ou por dia.
 
 Ao executar uma taxa definida por dia, multiplicar pelo **tempo simulado decorrente**; nunca pelo número de frames. Agendas, PRNG e subpassos necessários devem integrar save.
+
+## Primeira integração de Zoology/N3
+
+O runtime chama Zoology uma vez por tick lógico de 600 s, com posições e recursos do início desse tick. Na fronteira horária, fauna executa antes da atualização horária de clima, solo, água e Botany; a chuva acumulada da hora entra uma vez nesse fechamento. No tick que fecha o dia, a ordem é atualização horária, água diária/morte/reprodução de Zoology e, por fim, decomposição e confirmação de Soil. Captura e pedidos de alimento usam o snapshot anterior ao movimento; filhotes só entram no próximo tick. Esse encadeamento é a primeira implementação N3 e ainda precisa de validação integrada dos critérios quantitativos do documento 20.
 
 ## Spatial regridding
 

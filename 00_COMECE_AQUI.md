@@ -17,7 +17,7 @@ Construir do zero uma base C# modular, procedural e reprodutível para simular u
 
 ### Regras invioláveis
 
-1. Projetos, assemblies, namespaces e pastas de projeto usam prefixo `Game.*`; subpastas internas podem usar nomes de domínio como `Soil` ou `Botany`; jamais `Genesis.*`, `Asterra.*` ou o título do jogo. O slug do repositório `genesis` é apenas um endereço Git; os títulos nos documentos podem citar ASTERRA — Systema Naturae.
+1. Projetos, assemblies, namespaces e pastas de projeto usam prefixo `Game.*`; subpastas internas podem usar nomes de domínio como `Soil` ou `Botany`; nunca use nomes comerciais ou títulos de jogo nesses identificadores. O slug do repositório `genesis` é apenas um endereço Git; os documentos descrevem a visão técnica sem depender do nome final do produto.
 2. O repositório novo é a fonte de verdade. O legado é referência; não efetuar merge de histórico nem copiar código web sem análise.
 3. Nada de humanidade, economia, cidades, política, militar ou redes neurais no primeiro marco.
 4. A fundamentação `Mathematics/Physics/Chemistry/Biology` fica em `docs/science/` e **não** é projeto C#, namespace ou assembly. Implementar funções científicas nos módulos proprietários e utilitários puros apenas quando houver reuso demonstrado.

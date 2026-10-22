@@ -17,6 +17,25 @@ Todo contrato deve descrever `id`, `major/minor`, owner, grandeza física, unida
 
 Não criar interface única `IEnvironment` com 100 campos, nem um dicionário `Dictionary<string,object>` como API pública padrão. Manter matrizes numéricas compactas por chunk. O manifesto informa o que cada módulo **provê**, o que **requer** e o que apenas **usa se disponível**.
 
+## Capabilities publicadas no runtime L0
+
+Os exemplos acima descrevem a direção arquitetural; estas são as capabilities concretas presentes em `Game.Contracts`:
+
+| Owner | Capability | Fronteira publicada |
+|---|---|---|
+| Cosmos | `ISolarForcingV1` | Amostra solar instantânea `SolarForcingSampleV1` para dia/hora/latitude fornecidos pelo Core, com vetor de direção e irradiância acima da atmosfera; não avança o relógio lógico. |
+| Atmosphere | `IClimateForcingV1` | 24 horas × 16 tiles, chuva acumulada horária e cobertura de nuvens; inclui proxy de umidade relativa. |
+| Atmosphere | `IAtmosphericTemperatureV1` | Média sazonal e temperatura horária por dia, hora solar e altitude. |
+| Geosphere | `IGeosphereTerrainV1` | Campo de altitude, declividade e fator solar a partir do array de elevações. |
+| Geosphere | `ISoilWaterV1` | Estado hidráulico compacto do solo; calcula capacidade de infiltração, confirma evaporação e transpiração do estoque do solo. |
+| Geosphere | `ISoilBiogeochemistryV1` | Valida propostas de Botany/Ecology e confirma depósitos de nitrogênio mineral da fauna. |
+| Hydrosphere | `ISurfaceWaterV1` | Células físicas compactas de terreno/água; recebe chuva, roteia água, rateia pedidos diários de bebida e confirma água devolvida por mortalidade. |
+| Biosphere.Botany | `IBotanyV1` | Estado tipado de patches; confirma herbivoria concorrente por patch antes de devolver alimento efetivo a Zoology. |
+| Biosphere.Ecology | `IEcologyV1` | Confirma depósitos de detritos, fecha decomposição diária e propõe estoques do solo à Geosphere. |
+| Biosphere.Zoology | `IZoologyV1` | Agentes animais persistentes e estado tipado dos recursos consultados; usa `ZoologyCellStateV1`, sem expor `WorldCell`. |
+
+Core coordena as trocas entre módulos e confirma cada estoque pelo owner: Botany rateia herbivoria; Hydrosphere concede água; Geosphere confirma N mineral; Ecology recebe detritos. As interfaces públicas dos domínios usam contratos específicos e não expõem `WorldCell`. Os manifests estáticos em [`module-manifests`](module-manifests/README.md) descrevem os módulos por marco; o manifesto N3 registra que Zoology entrou no runtime, sem declarar aprovação do gate ecológico/científico completo.
+
 ## Compatibilidade e escala semântica
 
 - Acrescentar contrato separado preserva consumidores existentes. Campo opcional só é compatível se o formato e os consumidores aceitarem ausência/campos desconhecidos; assinaturas C# precisam de verificação própria.

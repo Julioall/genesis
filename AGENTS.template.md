@@ -1,6 +1,6 @@
 # AGENTS.md — Contrato de desenvolvimento assistido por IA
 
-O objetivo é construir um mundo natural procedural e vivo. O repositório principal é `Julioall/genesis`, mas nomes de projetos/assemblies/namespaces/pastas de código devem ser neutros, no formato **Game.***. Não criar `Genesis.*` ou `Asterra.*` como APIs.
+O objetivo é construir um mundo natural procedural e vivo. O repositório principal é `Julioall/genesis`, mas nomes de projetos/assemblies/namespaces/pastas de código devem ser neutros, no formato **Game.***. Não incluir nomes comerciais ou títulos de jogo nas APIs.
 
 - Ler `docs/00_SCOPE.md` e os documentos de módulo antes de alterar código.
 - Fluxos naturais e ecosistemas integrados; dependências de código acíclicas.

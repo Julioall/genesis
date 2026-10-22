@@ -1,0 +1,38 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Biosphere.Zoology",
+  "roadmapPhase": "Z2",
+  "gateStatus": "in-progress",
+  "scope": "renderer-neutral pose solvers plus owner-sampled terrestrial movement integration and deterministic grid detours for persistent N3 quadrupeds",
+  "ownedProcesses": [
+    "two-segment quadruped limb pose from a body-local foot contact target",
+    "explicit reporting when a requested foot contact lies outside limb reach",
+    "fish axial pose derived from flexible-joint angle limits",
+    "resolve sampled terrestrial routes against slope and wading depth limits",
+    "resolve sampled freshwater routes against minimum water depth",
+    "plan deterministic grid detours around slope and wading limits when a direct route is blocked",
+    "plan deterministic freshwater grid routes around cells shallower than the caller-supplied swim-depth limit without cutting diagonal corners",
+    "apply the accepted terrestrial route position and travel distance to persistent L0 agents",
+    "pose and movement output isolated from persistent agent state and metabolic costs"
+  ],
+  "ownedPersistentFields": [],
+  "providesCapabilities": [
+    "ICreaturePoseSolverV1",
+    "ICreatureMovementSolverV1"
+  ],
+  "coreMediatedInputs": [
+    "Core copies Geosphere ground elevation and Hydrosphere surface-water depth into ZoologyCellStateV1; Biosphere samples the read-only observations along a route"
+  ],
+  "scopeLimitations": [
+    "the integrated N3 movement uses fixed prototype slope and wading thresholds that are not calibrated to any real species",
+    "detours use only sampled slope and water fields; there is no body-volume collision or obstacle representation beyond those fields",
+    "freshwater routes have no current-vector, submerged-solid, or species-specific swimming-depth observations",
+    "aquatic displacement, current response, propulsion, and fish-agent integration remain unimplemented",
+    "Z1 anatomy and the N3 generic functional profiles are not linked into one per-individual locomotion profile"
+  ],
+  "validationPending": [
+    "calibrate movement thresholds and energetic cost against selected animal populations",
+    "add body-volume collision and test route-planner robustness across varied terrain before claiming travel around arbitrary obstacles",
+    "integrate fish displacement with water current and collision boundaries before claiming aquatic locomotion"
+  ]
+}

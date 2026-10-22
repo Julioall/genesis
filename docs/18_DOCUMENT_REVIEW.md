@@ -1,5 +1,7 @@
 # Revisão dos documentos — 21/10/2026
 
+> **Registro histórico:** esta revisão foi feita antes de o runtime C# ser integrado a esta branch. As afirmações abaixo sobre ausência de código, solução e testes descrevem aquele estado em 21/10/2026, não o checkout atual. O estado presente está em [README](../README.md), [roadmap](12_ROADMAP.md) e no [índice de evidências](reports/README.md).
+
 ## Revisão 2.8 — direção visual no MonoGame
 
 O usuário retirou a exigência de 2D/top-down/pixel art e pediu uma direção visual com base em duas imagens de referência. Em seguida, confirmou que o projeto deve permanecer na stack MonoGame para que o trabalho seja produzido por IA. Os requisitos visuais e a comparação de técnicas dentro do MonoGame estão em [22_VISUAL_DIRECTION_AND_TECHNOLOGY.md](22_VISUAL_DIRECTION_AND_TECHNOLOGY.md). As imagens recebidas foram copiadas para `docs/references/visual-direction/` para manter os links documentais portáveis.

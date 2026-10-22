@@ -39,7 +39,7 @@ Loop animal L0: perceber campos e recursos, buscar alvo, resolver ocupação/mov
 | Agente/estoque | Identidade | Propriedades principais |
 |---|---|---|
 | PlantPatch | `PlantPatchId`, `SpeciesProfileId`, `CellId` | biomassDryGPerM2, nitrogenGPerM2, seedBankGPerM2, seedBankNitrogenGPerM2; cobertura/demanda derivadas |
-| Animal | `AnimalId`, `FunctionalProfileId`, posição | ageDays, structuralDryG, reserveDryG, animalNitrogenG, hydrationL, alive; energia/prontidão derivadas |
+| Animal | `AnimalId`, `FunctionalProfileId`, posição | ageDays, structuralDryG, reserveDryG, hydrationL; N corporal é derivado da composição do perfil, assim como energia/prontidão |
 | Detritus | `CellId` | organicDryGPerM2, nitrogenGPerM2 |
 | Soil | `CellId` | soilWaterMm, capacityMm, mineralNGPerM2, organicDryGPerM2, soilOrganicNGPerM2 |
 
@@ -58,7 +58,19 @@ No esquema L0, massa seca animal total = `structuralDryG + reserveDryG`; `energy
 
 ## Limites declarados
 
-Sem fotossíntese bioquímica completa, ciclos biogeoquímicos globais de C/N (o inventário local de N continua obrigatório), doenças, reprodução sexuada genética, aprendizado neural, individualização microbiana, etologia complexa ou espécies fidedignamente calibradas. Esses elementos evoluem por contratos/capacidades depois do primeiro mundo funcional.
+Sem fotossíntese bioquímica completa, ciclos biogeoquímicos globais de C/N (o inventário local de N continua obrigatório), carcaças persistentes, doenças, reprodução sexual/recombinação validadas, aprendizado neural, individualização microbiana, etologia complexa ou espécies fidedignamente calibradas. Existe um protótipo técnico de genoma e herança uniparental em Z5; ele não representa genética populacional calibrada nem altera a ecologia N3.
+
+## Estado da implementação N3
+
+Zoology está implementado como submódulo de `Game.Modules.Biosphere` por `IZoologyV1`; Botany, Ecology, Geosphere e Hydrosphere confirmam os estoques que possuem por suas próprias capabilities. A configuração headless `--n3-scenario` inicia 40 herbívoros e 4 predadores. Os casos quantitativos, a continuação após save/load, três seeds por 365 dias e o gate headless de desempenho foram aprovados; o registro detalhado está em [Zoology/N3](reports/ZOOLOGY_N3_2026-10-22.md).
+
+Esse aceite é limitado ao L0 existente: herbívoro e predador são perfis funcionais, não espécies ou populações calibradas. Depois do checkpoint N3, os subgates técnicos Z1–Z5 acrescentaram genomas versionados e linhagem uniparental prototípica, desenvolvimento, solvers de locomoção/energia e geometria visual. Eles não fazem anatomia ou genética controlar a ecologia N3; seus limites estão no [plano modular de Zoology](specs/ZOOLOGY_MODULE_PLAN.md) e no [índice de evidências](reports/README.md).
+
+## Carcaça animal persistente — lacuna atual
+
+No runtime atual, a morte remove o agente vivo e transfere a matéria seca e o nitrogênio remanescentes para o detrito agregado da célula; a água corporal é devolvida à água superficial. Na predação, a porção consumida é contabilizada antes do depósito do restante. A transferência fecha os balanços, mas não deixa um corpo identificável no mundo: ainda não há `Carcass`, consumo posterior por carniceiros, estágios de decomposição, ossada ou histórico de descoberta.
+
+Uma futura carcaça deve ser uma entidade persistente da Biosphere/Ecology, identificada e serializada, distinta do detrito já transferido. Um contrato de discussão suficiente contém `id`, `sourceAnimalId`, `profileId`, posição, tick de criação, massa seca comestível/resistente e N correspondente. O estágio visual pode ser derivado dos estoques e do tempo. Decomposição e consumo retiram apenas o remanescente, com transferências confirmadas pelos owners; a mesma matéria nunca pode permanecer na carcaça e no detrito. Isto é requisito futuro, não tipo implementado.
 
 ## Fechamento obrigatório do modelo L0
 
@@ -69,7 +81,7 @@ Sem fotossíntese bioquímica completa, ciclos biogeoquímicos globais de C/N (o
 - **Reprodução:** sementes retiram massa/N do patch; germinação transfere do banco de sementes ao patch. Filhote retira massa, N, água corporal e reserva do progenitor na mesma transação; custo metabólico tem destino explícito. Maturidade e limiar de reserva são condições, não fontes de matéria. Reprodução assexuada funcional é abstração L0 declarada; não exige sexos, pares ou genética. Falha na criação não debita o progenitor.
 - **Predação e morte:** presa capturada apenas uma vez; parte assimilada, parte não assimilada e restos vão aos destinos declarados. Cadáver recebe só o remanescente, nunca a massa inteira já consumida. Entidade morta não age nem reproduz após o commit.
 - **Decomposição:** atividade agregada é coeficiente de processo, sem biomassa microbiana separada no L0. Particionar detritos em matéria orgânica edáfica e perda respiratória; particionar seu N em N orgânico do solo e N mineral. A soma dos destinos de cada grandeza, incluindo perdas declaradas, iguala a retirada dentro da tolerância. Soil aplica mineralização lenta do seu próprio N orgânico; Ecology não decompõe o mesmo estoque novamente. Sem nitrificação, desnitrificação ou imobilização microbiana explícitas nesta fase.
-- **Água biológica:** plantas não precisam de reservatório hídrico persistente L0: captação/transpiração são passagem contabilizada solo → fronteira. Animais mantêm água corporal e bebem de superfície; desidratação/excreção e água da morte têm destino explícito. Água do alimento pode ser omitida declaradamente no L0. Interceptação vegetal inicial é fração evaporada no intervalo, sem reservatório de copa; água não evaporada alcança a superfície.
+- **Água biológica:** plantas não precisam de reservatório hídrico persistente L0: captação/transpiração são passagem contabilizada solo → fronteira. Animais mantêm água corporal e bebem de superfície; desidratação/excreção e água de morte, inclusive por predação, retornam à superfície via Hydrosphere. Água do alimento pode ser omitida declaradamente no L0. Interceptação vegetal inicial é fração evaporada no intervalo, sem reservatório de copa; água não evaporada alcança a superfície.
 - **Comportamento:** percepção local limitada, escolha por utilidade ou estados e deslocamento por vizinhança com desempate estável. Distância é em metros e velocidade em m/s; limitar deslocamento pelo tempo transcorrido e pelas barreiras. Sem planejamento global, memória cognitiva, rebanhos complexos ou evolução adaptativa no MVP.
 
 Essas regras fecham abstrações contábeis; não certificam fidelidade fisiológica. Ausência de estoque significa processo omitido/de fronteira declarado, nunca quantidade criada sem origem.

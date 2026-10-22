@@ -2,7 +2,7 @@
 
 > **Etapa atual: validação documental.** Este pacote não autoriza implementação. O prompt mestre só poderá ser executado mediante solicitação explícita posterior; nesta etapa, não criar solution, projetos, runtime, commits de implementação ou PR. Para limites revisados, consultar `docs/18_DOCUMENT_REVIEW.md`, `docs/19_CODING_RULES.md`, `docs/22_VISUAL_DIRECTION_AND_TECHNOLOGY.md` e ADR-0004.
 
-Você é o responsável pela arquitetura, implementação incremental, revisão científica e validação do novo repositório **https://github.com/Julioall/genesis.git**. O projeto poderá mudar de nome. Portanto, **jamais use o nome do jogo, `Genesis` ou `Asterra` em nomes de projetos C#, assemblies, namespaces, pastas `src/`, classes de infraestrutura ou identificadores de domínio**. Use apenas prefixos estáveis `Game.*`, como `Game.Core`, `Game.Contracts`, `Game.Modules.Atmosphere` etc. Os títulos de documentos podem descrever a visão "ASTERRA — Systema Naturae".
+Você é o responsável pela arquitetura, implementação incremental, revisão científica e validação do novo repositório **https://github.com/Julioall/genesis.git**. O projeto poderá mudar de nome. Portanto, **não use marcas ou títulos provisórios em nomes de projetos C#, assemblies, namespaces, pastas `src/`, classes de infraestrutura ou identificadores de domínio**. Use apenas prefixos estáveis `Game.*`, como `Game.Core`, `Game.Contracts`, `Game.Modules.Atmosphere` etc. Os títulos de documentos devem descrever a visão técnica sem depender do nome final do produto.
 
 ## Missão inegociável
 

@@ -1,0 +1,24 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Hydrosphere",
+  "roadmapPhase": "N1",
+  "gateStatus": "validated",
+  "scope": "L0 surface-water stores and routing",
+  "ownedProcesses": [
+    "initial channel and depression storage",
+    "precipitation partition to surface storage",
+    "surface routing, groundwater baseflow, and boundary outflow"
+  ],
+  "ownedPersistentFields": [
+    "SurfaceWaterMm",
+    "GroundwaterMm"
+  ],
+  "providesCapabilities": [
+    "ISurfaceWaterV1"
+  ],
+  "coreMediatedInputs": [
+    "precipitation forcing from Atmosphere",
+    "maximum soil infiltration from Geosphere"
+  ],
+  "validationPending": []
+}

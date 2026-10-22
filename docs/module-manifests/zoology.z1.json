@@ -1,0 +1,24 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Biosphere.Zoology",
+  "roadmapPhase": "Z1",
+  "gateStatus": "validated",
+  "scope": "technically validated versioned species prototypes, direct typed genomes, two prototype body plans and deterministic headless development",
+  "ownedProcesses": [
+    "species-bound genome sampling with independent anatomy and pigment streams",
+    "bounded deterministic mutation within an explicit species compatibility group",
+    "immutable quadruped and freshwater fish body development",
+    "renderer-neutral visual recipe from pigment genes"
+  ],
+  "ownedPersistentFields": [],
+  "providesCapabilities": [
+    "ICreatureDevelopmentV1"
+  ],
+  "coreMediatedInputs": [],
+  "scopeLimitations": [
+    "reference dimensions and gene envelopes are engineering prototypes, not empirically calibrated species data; per-species and population calibration remains open",
+    "N3 now persists a Z1 genome per agent, but its physiology and ecology do not yet consume genotype-derived traits",
+    "locomotion, physiology, ecology and evolutionary integration remain later gates"
+  ],
+  "validationPending": []
+}

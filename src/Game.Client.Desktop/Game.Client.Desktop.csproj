@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Game.Core\Game.Core.csproj" />
+    <ProjectReference Include="..\Game.Modules.Cosmos\Game.Modules.Cosmos.csproj" />
+    <ProjectReference Include="..\Game.Modules.Atmosphere\Game.Modules.Atmosphere.csproj" />
+    <ProjectReference Include="..\Game.Modules.Geosphere\Game.Modules.Geosphere.csproj" />
+    <ProjectReference Include="..\Game.Modules.Hydrosphere\Game.Modules.Hydrosphere.csproj" />
+    <ProjectReference Include="..\Game.Modules.Biosphere\Game.Modules.Biosphere.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <MonoGameContentReference Include="Content\Content.mgcb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Content\VisualEvaluation\Trees\*.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

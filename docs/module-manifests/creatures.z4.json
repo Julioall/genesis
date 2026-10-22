@@ -1,0 +1,40 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Procedural.Creatures",
+  "roadmapPhase": "Z4",
+  "gateStatus": "in-progress",
+  "scope": "renderer-neutral per-part pose-source surfaces and unified smooth-implicit render mesh with parent-child anatomical connectors, versioned developed anatomy and pigment recipe, static quadruped stance deformation using Z2 pose outputs, plus a MonoGame diagnostic view linked to persistent N3 genotypes and positions",
+  "ownedProcesses": [
+    "validate visual recipe identity/version against developed body",
+    "generate deterministic per-part surface vertices, normals, UVs and RGBA vertex colors",
+    "extract one connected renderer surface from a smooth implicit union of anatomical ellipsoids and parent-child links",
+    "place small vision and olfaction markers from body-local sensory anchors",
+    "derive color and stripe variation from pigment recipe without changing anatomical positions",
+    "add low-resolution blend ellipsoids aligned to parent-child anatomical links inside the corresponding part surface range",
+    "apply display-only caudal fin aspect and body-axis thickness corrections without changing developed anatomy",
+    "expose per-surface ranges so renderer-neutral limb poses can transform only their matching anatomy parts",
+    "apply a static four-limb visual stance from Z2 inverse-kinematics outputs without changing agent state",
+    "adapt mesh data to MonoGame and render the two prototype plans in a static gallery with an isolated orbitable fish inspection view",
+    "develop per-agent quadruped anatomy and pigment from its persisted genome and visual age stage",
+    "cache geometry by genome/development stage and draw it at the live N3 position without writing simulation state"
+  ],
+  "ownedPersistentFields": [],
+  "providesCapabilities": [
+    "ICreatureGeometryBuilderV1"
+  ],
+  "coreMediatedInputs": [],
+  "scopeLimitations": [
+    "12 sampled combinations across both body plans, three genome/pigment pairs and two tessellations validate one connected component, opposite winding across two incident triangles per edge, a single cycle in each vertex link and no degenerate faces; the intersection scan excludes pairs sharing vertices and does not establish general self-intersection freedom",
+    "herbivore and predator functional roles still use the same generic quadruped species definition",
+    "quadruped limbs use a static visual support pose only; there is no gait, velocity-driven animation, collision response, or persisted foot contact, and fish remains gallery-only",
+    "the current N3 client still maps both functional roles to one generic quadruped body plan; species-specific silhouettes await upstream Z1 species definitions",
+    "the integrated population diagnostic still renders only quadrupeds; fish has an isolated static multi-angle gallery view but is not part of the persistent N3 population",
+    "no LOD/performance evidence or full invariance check through the actual renderer with camera, FPS, culling and rendering toggles",
+    "geometry generation does not alter simulation state"
+  ],
+  "validationPending": [
+    "select a fish species/population and replace the generic fish silhouette with a versioned calibrated body plan; extend self-intersection checks to pairs sharing vertices and a broader seed/resolution sample before claiming general self-intersection freedom",
+    "animate quadruped pose from an explicit locomotion state without coupling simulation to rendering",
+    "extend the geometry-only no-mutation test to actual renderer toggles, camera, FPS, culling and LOD; measure generated geometry cost"
+  ]
+}

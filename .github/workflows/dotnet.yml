@@ -1,0 +1,18 @@
+name: .NET
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Game.sln
+      - run: dotnet build Game.sln --configuration Release --no-restore
+      - run: dotnet test Game.sln --configuration Release --no-build --no-restore

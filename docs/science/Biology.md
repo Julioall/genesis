@@ -2,6 +2,8 @@
 
 **Natureza:** documentação científica. Código de árvores, gramíneas, fauna e ecologia pertence a `Game.Modules.Biosphere`.
 
+Para morfogênese, genótipo/fenótipo, controle corporificado e técnicas de vida artificial, consulte [Morfogênese computacional e vida artificial](Biology/Morphogenesis-and-Artificial-Life.md). A aplicação desses conceitos em fauna está dividida nas specs `ZOO-*`; o estado real e os limites de implementação estão no [plano modular de Zoology](../specs/ZOOLOGY_MODULE_PLAN.md).
+
 ## Fenômenos necessários no primeiro mundo vivo
 
 - **Botany:** germinação, assimilação e crescimento dependentes de luz, temperatura, água e disponibilidade nutricional; sementes, competição e mortalidade.

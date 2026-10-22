@@ -1,0 +1,49 @@
+{
+  "manifestVersion": 1,
+  "moduleId": "Game.Modules.Biosphere.Zoology",
+  "roadmapPhase": "N3",
+  "gateStatus": "validated",
+  "scope": "L0 herbivore and predator agents",
+  "specificationReferences": [
+    "docs/specs/ZOOLOGY_MODULE_PLAN.md",
+    "docs/specs/ZOO-100-BODYPLANS-GENOMES.md",
+    "docs/specs/ZOO-110-ANATOMY-LOCOMOTION.md",
+    "docs/specs/ZOO-120-PHYSIOLOGY-ECOLOGY.md",
+    "docs/specs/ZOO-130-RENDERING.md",
+    "docs/specs/ZOO-140-EVOLUTION.md",
+    "docs/specs/ZOO-ACCEPTANCE.md"
+  ],
+  "scopeLimitations": [
+    "functional herbivore/predator profiles are not species or genomes",
+    "N3 agents persist Z1 prototype genomes and one-parent mutated offspring, but genotype-derived anatomy and traits do not yet affect their physiology or ecology; aquatic fish locomotion is not implemented",
+    "sexual recombination, species-specific compatibility, gene-linked selection and speciation are not implemented",
+    "visual animal experiment is presentation only and is not the biological source of truth"
+  ],
+  "ownedProcesses": [
+    "animal metabolism, movement, hydration, maintenance deficits, and mortality",
+    "local herbivory and predation proposals",
+    "daily reproduction and persistent animal identity"
+  ],
+  "ownedPersistentFields": [
+    "SimulationState.Animals",
+    "SimulationState.NextAnimalId",
+    "animal position, age, structural dry mass, reserve, hydration, deficits, cooldown, and last capture day",
+    "AnimalAgentV1.Genome (Z5 prototype genotype and parent-genome lineage)"
+  ],
+  "providesCapabilities": [
+    "IZoologyV1"
+  ],
+  "coreMediatedInputs": [
+    "plant patch biomass and nitrogen",
+    "surface water and mineral nitrogen",
+    "detritus stocks for deposits from feeding, capture, and mortality",
+    "tick, day, and deterministic random seed"
+  ],
+  "ownerProposals": [
+    "patch biomass and nitrogen after simultaneous herbivory",
+    "cell detritus and mineral nitrogen after animal transfers",
+    "surface water after batched animal drinking and captured/deceased animal deposits",
+    "animal state and metabolism outputs"
+  ],
+  "validationPending": []
+}
