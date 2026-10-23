@@ -439,6 +439,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 initialPopulation)
             : WorldSimulation.Load(File.ReadAllText(_snapshotPath), _cosmos, _atmosphere, _atmosphere,
                 _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere);
+        if (_snapshotPath is not null)
+            TerrainSnapshotCompatibility.Validate(_world.Snapshot());
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = presentationWidth,
@@ -2500,9 +2502,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 var radius = ring / (double)radialRings;
                 var gridX = feature.CenterEastCell + (rim.EastCell - feature.CenterEastCell) * radius;
                 var gridY = feature.CenterNorthCell + (rim.NorthCell - feature.CenterNorthCell) * radius;
-                var elevation = ring == radialRings
-                    ? DisplayElevation(rim.CrownElevationM)
-                    : _terrainHeightSampler(gridX, gridY);
+                // Keep the rim on the same presented surface as the interior.
+                var sampleRadius = ring == radialRings ? radius * 0.999999 : radius;
+                var elevation = _terrainHeightSampler(
+                    feature.CenterEastCell + (rim.EastCell - feature.CenterEastCell) * sampleRadius,
+                    feature.CenterNorthCell + (rim.NorthCell - feature.CenterNorthCell) * sampleRadius);
                 var position = new Vector3((float)(gridX * Tile), (float)elevation, (float)(gridY * Tile));
                 const double normalStep = 0.08;
                 var eastSlope = (_terrainHeightSampler(gridX + normalStep, gridY)
@@ -2568,8 +2572,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
             Vector3 WallPoint(TerrainRimPoint point, float depthFraction)
             {
-                var crownElevation = (float)DisplayElevation(point.CrownElevationM);
-                var baseElevation = (float)DisplayElevation(point.ToeElevationM - 1.0);
+                // Apply the island and biome transforms to walls as well as terrain.
+                var crownElevation = (float)_terrainHeightSampler(
+                    feature.CenterEastCell + (point.EastCell - feature.CenterEastCell) * 0.999999,
+                    feature.CenterNorthCell + (point.NorthCell - feature.CenterNorthCell) * 0.999999);
+                var baseElevation = (float)_underlyingHeightSampler(point.EastCell, point.NorthCell) - 1f;
                 var angle = Math.Atan2(point.NorthCell - feature.CenterNorthCell,
                     point.EastCell - feature.CenterEastCell);
                 var taper = Math.Sin(depthFraction * Math.PI);
@@ -4238,9 +4245,12 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void LoadWorld()
     {
         if (!File.Exists(_savePath)) return;
-        _world = WorldSimulation.Load(File.ReadAllText(_savePath), _cosmos, _atmosphere, _atmosphere,
+        var loadedWorld = WorldSimulation.Load(File.ReadAllText(_savePath), _cosmos, _atmosphere, _atmosphere,
             _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere);
-        _snapshot = _world.Snapshot();
+        var loadedSnapshot = loadedWorld.Snapshot();
+        TerrainSnapshotCompatibility.Validate(loadedSnapshot);
+        _world = loadedWorld;
+        _snapshot = loadedSnapshot;
         RefreshHydrologyPresentationFields();
         _groundSpritesRevision = -1;
         _tickAccumulator = 0;
