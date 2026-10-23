@@ -30,8 +30,8 @@ public sealed class CreatureMovementSolverV1 : ICreatureMovementSolverV1
             || !double.IsFinite(request.MaximumSampleSpacingM) || request.MaximumSampleSpacingM <= 0)
             throw new ArgumentOutOfRangeException(nameof(request), "Movement limits must be finite and non-negative; sample spacing must be positive.");
 
-        var samples = request.RouteSamples.ToArray();
-        for (var index = 0; index < samples.Length; index++)
+        var samples = request.RouteSamples;
+        for (var index = 0; index < samples.Count; index++)
         {
             var sample = samples[index];
             if (!double.IsFinite(sample.XPositionM) || !double.IsFinite(sample.ZPositionM)
@@ -53,7 +53,7 @@ public sealed class CreatureMovementSolverV1 : ICreatureMovementSolverV1
             return ResultAt(start, 0, 1, false, CreatureMovementStopReasonV1.DistanceLimit, request.Habitat);
 
         var traveled = 0.0;
-        for (var index = 1; index < samples.Length; index++)
+        for (var index = 1; index < samples.Count; index++)
         {
             var from = samples[index - 1];
             var to = samples[index];
@@ -95,7 +95,7 @@ public sealed class CreatureMovementSolverV1 : ICreatureMovementSolverV1
             traveled += segmentLength;
         }
 
-        return ResultAt(samples[^1], traveled, samples.Length, true,
+        return ResultAt(samples[^1], traveled, samples.Count, true,
             CreatureMovementStopReasonV1.TargetReached, request.Habitat);
     }
 

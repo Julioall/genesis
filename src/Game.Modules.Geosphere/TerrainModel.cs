@@ -140,7 +140,11 @@ public static class TerrainModel
 
     private sealed class TerrainGenerator
     {
-        private const double MinimumPlateauReliefM = 18;
+        // Leave a representable margin above the public 18 m wall-floor after rim sampling.
+        private const double MinimumPlateauReliefM = 18.000001;
+        private const double MaximumPlateauWallM = 39.999999;
+        private const double RidgeWidthMultiplier = 1.45;
+        private const double RidgeAmplitudeMultiplier = 0.80;
         private readonly ValueNoise _broad;
         private readonly ValueNoise _regional;
         private readonly ValueNoise _detail;
@@ -179,15 +183,15 @@ public static class TerrainModel
                     0,
                     (12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 49, 1, 0, 0) * 4) * _scaleX,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 50, 1, 0, 0) * 0.24,
-                    (4.6 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 51, 1, 0, 0) * 1.0) * _scaleX,
-                    170 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 20,
+                    (4.6 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 51, 1, 0, 0) * 1.0) * _scaleX * RidgeWidthMultiplier,
+                    (170 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 20) * RidgeAmplitudeMultiplier,
                     westPhase),
                 new MountainRange(
                     1,
                     (48 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 53, 1, 0, 0) * 4) * _scaleX,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 54, 1, 0, 0) * 0.24,
-                    (4.0 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 55, 1, 0, 0) * 0.9) * _scaleX,
-                    132 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 18,
+                    (4.0 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 55, 1, 0, 0) * 0.9) * _scaleX * RidgeWidthMultiplier,
+                    (132 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 18) * RidgeAmplitudeMultiplier,
                     eastPhase)
             ];
             _ridgeSpurs = CreateRidgeSpurs(seed);
@@ -345,22 +349,44 @@ public static class TerrainModel
             double baseCrownElevationM,
             double phase)
         {
-            var feature = new OutcropFeature(index, centerEastCell, centerNorthCell,
-                radiusEastCells, radiusNorthCells, baseCrownElevationM, phase);
-            var highestRimToe = double.NegativeInfinity;
-            for (var segment = 0; segment < 160; segment++)
+            var originalRadiusEast = radiusEastCells;
+            var originalRadiusNorth = radiusNorthCells;
+            // Preserve the seeded location and shrink only as much as needed to keep every point
+            // on the physical rim within the wall-height limit.
+            for (var scale = 1.0; scale >= 0.1; scale -= 0.025)
             {
-                var angle = 2 * Math.PI * segment / 160;
-                var shape = BoundaryScale(angle, feature);
-                var x = centerEastCell + Math.Cos(angle) * radiusEastCells * shape;
-                var y = centerNorthCell + Math.Sin(angle) * radiusNorthCells * shape;
-                highestRimToe = Math.Max(highestRimToe, UnderlyingElevation(x, y));
+                radiusEastCells = originalRadiusEast * scale;
+                radiusNorthCells = originalRadiusNorth * scale;
+                var feature = new OutcropFeature(index, centerEastCell, centerNorthCell,
+                    radiusEastCells, radiusNorthCells, baseCrownElevationM, phase);
+                var minimumRimToe = double.PositiveInfinity;
+                var maximumRimToe = double.NegativeInfinity;
+                for (var segment = 0; segment < 160; segment++)
+                {
+                    var angle = 2 * Math.PI * segment / 160;
+                    var shape = BoundaryScale(angle, feature);
+                    var x = centerEastCell + Math.Cos(angle) * radiusEastCells * shape;
+                    var y = centerNorthCell + Math.Sin(angle) * radiusNorthCells * shape;
+                    var toe = UnderlyingElevation(x, y);
+                    minimumRimToe = Math.Min(minimumRimToe, toe);
+                    maximumRimToe = Math.Max(maximumRimToe, toe);
+                }
+
+                if (maximumRimToe - minimumRimToe > MaximumPlateauWallM - MinimumPlateauReliefM)
+                    continue;
+                if (centerEastCell - radiusEastCells < 0 || centerNorthCell - radiusNorthCells < 0
+                    || centerEastCell + radiusEastCells >= SimulationState.Width
+                    || centerNorthCell + radiusNorthCells >= SimulationState.Height)
+                    continue;
+
+                return feature with
+                {
+                    CrownElevationM = Math.Min(340, Math.Clamp(baseCrownElevationM,
+                        maximumRimToe + MinimumPlateauReliefM, minimumRimToe + MaximumPlateauWallM))
+                };
             }
 
-            return feature with
-            {
-                CrownElevationM = Math.Min(340, Math.Max(baseCrownElevationM, highestRimToe + MinimumPlateauReliefM))
-            };
+            throw new InvalidOperationException($"Could not place outcrop {index} with walls no higher than {MaximumPlateauWallM} m.");
         }
 
         private double OutcropDistance(double x, double y, OutcropFeature feature)

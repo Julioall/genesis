@@ -10,11 +10,73 @@ using Game.Modules.Geosphere;
 using Game.Modules.Hydrosphere;
 using Game.Procedural;
 using Microsoft.Xna.Framework;
+using Xunit.Abstractions;
 
 namespace Game.Tests;
 
 public sealed class L0WorldTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public L0WorldTests(ITestOutputHelper output) => _output = output;
+
+    [Theory]
+    [InlineData(1UL, 2790, 2416)]
+    [InlineData(2UL, 2540, 2244)]
+    [InlineData(3UL, 2739, 2340)]
+    public void Relief_habitat_counts_are_measured_against_baseline(ulong seed, int baselineVegetation, int baselineLand)
+    {
+        var snapshot = TestWorldFactory.Create(seed).Snapshot();
+        var elevations = TerrainModel.GenerateElevationField(seed);
+        var vegetation = 0;
+        var land = new bool[snapshot.Cells.Count];
+        for (var i = 0; i < snapshot.Cells.Count; i++)
+        {
+            var cell = snapshot.Cells[i];
+            var slope = TerrainModel.SlopeMagnitude(elevations, cell.X, cell.Y);
+            if (cell.SurfaceWaterMm <= 150 && slope <= 1.0) vegetation++;
+            land[i] = cell.SurfaceWaterMm <= 150 && slope <= 0.75;
+        }
+
+        var visited = new bool[land.Length];
+        var largest = 0;
+        for (var start = 0; start < land.Length; start++)
+        {
+            if (!land[start] || visited[start]) continue;
+            var queue = new Queue<int>();
+            queue.Enqueue(start);
+            visited[start] = true;
+            var size = 0;
+            while (queue.TryDequeue(out var index))
+            {
+                size++;
+                var x = index % SimulationState.Width;
+                var y = index / SimulationState.Width;
+                for (var dy = -1; dy <= 1; dy++)
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    var nx = x + dx;
+                    var ny = y + dy;
+                    if (nx < 0 || nx >= SimulationState.Width || ny < 0 || ny >= SimulationState.Height) continue;
+                    var neighbor = ny * SimulationState.Width + nx;
+                    if (visited[neighbor] || !land[neighbor]) continue;
+                    visited[neighbor] = true;
+                    queue.Enqueue(neighbor);
+                }
+            }
+            largest = Math.Max(largest, size);
+        }
+
+        var conservativeLand = land.Count(value => value);
+        Assert.True(vegetation >= baselineVegetation,
+            $"Seed {seed} vegetation-eligible cells {vegetation} fell below baseline {baselineVegetation}.");
+        Assert.True(conservativeLand >= baselineLand,
+            $"Seed {seed} conservative terrestrial habitat {conservativeLand} fell below baseline {baselineLand}.");
+        Assert.True(largest >= conservativeLand * 0.90,
+            $"Seed {seed} largest connected terrestrial component {largest} is less than 90% of eligible habitat {conservativeLand}.");
+        _output.WriteLine($"seed={seed} vegetation={vegetation} conservative-land={conservativeLand} largest-d8={largest}");
+    }
+
     [Fact]
     public void Counter_random_matches_the_documented_L0_vector()
     {
@@ -49,7 +111,7 @@ public sealed class L0WorldTests
         Assert.Equal(first, repeat);
         Assert.NotEqual(first, otherSeed);
         Assert.True(first.Max() - first.Min() > 45);
-        Assert.True(first.Max() > 220, $"Expected a high mountain crest in the raised v16 terrain, got {first.Max():F1} m.");
+        Assert.True(first.Max() > 190, $"Expected a distinct high mountain crest after reducing ridge amplitude, got {first.Max():F1} m.");
 
         var rowsWithMountainCrests = Enumerable.Range(0, SimulationState.Height)
             .Count(y => Enumerable.Range(0, SimulationState.Width)
@@ -95,6 +157,57 @@ public sealed class L0WorldTests
             "The western mountain crest should not be a straight line parallel to the river.");
         Assert.True(eastCrests.Max() - eastCrests.Min() >= 4,
             "The eastern mountain crest should not be a straight line parallel to the river.");
+    }
+
+    [Theory]
+    [InlineData(1UL)]
+    [InlineData(2UL)]
+    [InlineData(3UL)]
+    public void Common_terrain_differences_are_reduced_without_losing_mountain_relief(ulong seed)
+    {
+        var elevation = TerrainModel.GenerateElevationField(seed);
+        var surface = TerrainModel.CreateElevationSampler(seed);
+        var underlying = TerrainModel.CreateUnderlyingElevationSampler(seed);
+        var commonDrops = new List<double>();
+        for (var y = 0; y < SimulationState.Height; y++)
+        for (var x = 0; x < SimulationState.Width; x++)
+        {
+            var index = y * SimulationState.Width + x;
+            AddNeighbor(x + 1 < SimulationState.Width, x + 1, y);
+            AddNeighbor(y + 1 < SimulationState.Height, x, y + 1);
+
+            void AddNeighbor(bool exists, int neighborX, int neighborY)
+            {
+                if (!exists) return;
+                var neighborIndex = neighborY * SimulationState.Width + neighborX;
+                var difference = Math.Abs(elevation[index] - elevation[neighborIndex]);
+                var x0 = x + 0.5;
+                var y0 = y + 0.5;
+                var x1 = neighborX + 0.5;
+                var y1 = neighborY + 0.5;
+                if (Math.Abs(surface(x0, y0) - underlying(x0, y0)) <= 2
+                    && Math.Abs(surface(x1, y1) - underlying(x1, y1)) <= 2)
+                    commonDrops.Add(difference);
+            }
+        }
+
+        commonDrops.Sort();
+        var p95 = commonDrops[(int)Math.Ceiling(commonDrops.Count * 0.95) - 1];
+        _output.WriteLine($"seed={seed} common-p95={p95:F2} common-max={commonDrops[^1]:F2}");
+        var baselineP95 = seed switch { 1 => 16.44, 2 => 18.37, _ => 16.84 };
+        var baselineMaximum = seed switch { 1 => 39.96, 2 => 41.18, _ => 38.82 };
+        Assert.True(p95 <= baselineP95 * 0.90, $"Seed {seed} common P95 {p95:F2} m did not improve by 10% from {baselineP95:F2} m.");
+        Assert.True(commonDrops[^1] <= baselineMaximum, $"Seed {seed} maximum common physical drop {commonDrops[^1]:F2} m exceeds baseline {baselineMaximum:F2} m.");
+        Assert.True(elevation.Max() > 180, $"Seed {seed} lost its mountain relief.");
+        var outcrops = TerrainModel.GenerateOutcropGeometries(seed);
+        Assert.Equal(7, outcrops.Count);
+        foreach (var outcrop in outcrops)
+        foreach (var point in outcrop.Rim)
+            Assert.InRange(point.CrownElevationM - point.ToeElevationM, 18, 40);
+        for (var first = 0; first < outcrops.Count; first++)
+        for (var second = first + 1; second < outcrops.Count; second++)
+            Assert.True(Math.Sqrt(Math.Pow(outcrops[first].CenterEastCell - outcrops[second].CenterEastCell, 2)
+                + Math.Pow(outcrops[first].CenterNorthCell - outcrops[second].CenterNorthCell, 2)) > 12);
     }
 
     [Fact]
@@ -143,7 +256,7 @@ public sealed class L0WorldTests
         var mapScale = SimulationState.Width / 64.0;
         Assert.True(maximumRimRadius < 5.3 * mapScale,
             $"The weathered outcrop should remain local, but its radius is {maximumRimRadius:F2} cells.");
-        Assert.True(maximumRimRadius - minimumRimRadius > 0.8, "The outcrop rim should have irregular, non-elliptical relief.");
+        Assert.True(maximumRimRadius - minimumRimRadius > 0.2, "The outcrop rim should retain irregular, non-elliptical relief after fitting its walls to the slope.");
         Assert.True(maximumRimSegmentCells < 1);
     }
 
@@ -171,6 +284,7 @@ public sealed class L0WorldTests
                 minimumRise = Math.Min(minimumRise, point.CrownElevationM - point.ToeElevationM);
                 Assert.Equal(point.ToeElevationM, underlyingElevation(point.EastCell, point.NorthCell), 5);
                 Assert.True(point.CrownElevationM > elevation(point.EastCell + dx * 0.02, point.NorthCell + dy * 0.02));
+                Assert.InRange(point.CrownElevationM - point.ToeElevationM, 18, 40);
             }
 
             Assert.True(minimumRise >= 17.9, $"Outcrop {feature.FeatureIndex} has only {minimumRise:F1} m of physical relief.");
@@ -184,6 +298,18 @@ public sealed class L0WorldTests
             Assert.True(Math.Sqrt(Math.Pow(features[first].CenterEastCell - features[second].CenterEastCell, 2)
                 + Math.Pow(features[first].CenterNorthCell - features[second].CenterNorthCell, 2)) > 12,
                 "Seeded outcrop crowns must remain separate physical features.");
+    }
+
+    [Fact]
+    public void Desktop_terrain_snapshots_reject_a_field_from_another_generator_version()
+    {
+        var snapshot = TestWorldFactory.Create(1).Snapshot();
+        TerrainSnapshotCompatibility.Validate(snapshot);
+
+        var cells = snapshot.Cells.ToArray();
+        cells[0] = cells[0] with { ElevationM = cells[0].ElevationM + 1 };
+        var olderTerrain = new WorldSnapshot(snapshot.Seed, snapshot.TickIndex, cells, snapshot.Animals.ToArray(), new FluxLedgerState());
+        Assert.Throws<InvalidDataException>(() => TerrainSnapshotCompatibility.Validate(olderTerrain));
     }
 
     [Fact]

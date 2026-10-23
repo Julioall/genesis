@@ -303,6 +303,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private MouseState _previousMouse;
     private bool _hasPreviousMouse;
     private bool _cameraNavigationDirty;
+    private bool _groundSpriteProjectionDirty;
     private double _cameraNavigationIdleSeconds;
     private float _treeLodProjectionScale;
     private Func<double, double, double> _terrainHeightSampler = null!;
@@ -320,6 +321,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private ulong _groundSpritesSeed = ulong.MaxValue;
     private int _groundSpritesViewportWidth = -1;
     private int _groundSpritesViewportHeight = -1;
+    private float _groundSpritesProjectionZoom = 1f;
     private Season _groundSpritesSeason = Season.Summer;
     private int _terrainOverlay = -1;
     private readonly CosmosModuleV1 _cosmos = new();
@@ -360,12 +362,17 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private int _faunaSpriteCount;
     private string _faunaLayoutHash = "";
     private bool _paused;
+    private bool _seasonAdvanceButtonPointerCaptured;
+    private Task<WorldSnapshot>? _seasonAdvanceTask;
+    private CancellationTokenSource? _seasonAdvanceCancellation;
+    private string? _seasonAdvanceFailureMessage;
     private readonly bool _synchronizeWithVsync;
     private bool _perspectiveProjection;
     private bool _showHud = true;
     private int _overlayMode;
     private int _speedIndex = 2;
     private static readonly int[] Speeds = [1, 2, 6, 12, 24];
+    private static readonly Rectangle SeasonAdvanceButtonBounds = new(452, 42, 118, 23);
     private readonly string _savePath;
 
     public NaturalWorldGame(string? capturePath, string? snapshotPath, string savePath, int? benchmarkDurationSeconds,
@@ -439,6 +446,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 initialPopulation)
             : WorldSimulation.Load(File.ReadAllText(_snapshotPath), _cosmos, _atmosphere, _atmosphere,
                 _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere);
+        if (_snapshotPath is not null)
+            TerrainSnapshotCompatibility.Validate(_world.Snapshot());
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = presentationWidth,
@@ -571,6 +580,16 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
     protected override void UnloadContent()
     {
+        _seasonAdvanceCancellation?.Cancel();
+        if (_seasonAdvanceTask is not null)
+        {
+            try { _seasonAdvanceTask.GetAwaiter().GetResult(); }
+            catch (OperationCanceledException) { }
+            catch (Exception exception) { Console.Error.WriteLine($"Season advance stopped during shutdown: {exception.Message}"); }
+        }
+        _seasonAdvanceCancellation?.Dispose();
+        _seasonAdvanceCancellation = null;
+        _seasonAdvanceTask = null;
         foreach (var mesh in _creatureGeometryCache.Values) mesh.Vertices.Dispose();
         _creatureGeometryCache.Clear();
         base.UnloadContent();
@@ -588,10 +607,33 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         }
         // Benchmarks must measure the requested CLI camera, regardless of incidental input
         // accumulated by the foreground window while the timed run is in progress.
+        var mouse = Mouse.GetState();
+        var previousLeftButtonDown = _hasPreviousMouse && _previousMouse.LeftButton == ButtonState.Pressed;
+        var leftButtonDown = mouse.LeftButton == ButtonState.Pressed;
+        var seasonButtonAvailable = !_visualEvaluation && _capturePath is null && _benchmarkDurationSeconds is null;
+        if (leftButtonDown && !previousLeftButtonDown)
+            _seasonAdvanceButtonPointerCaptured = seasonButtonAvailable && _showHud
+                && SeasonAdvanceButtonBounds.Contains(mouse.X, mouse.Y);
+        if (!leftButtonDown && previousLeftButtonDown)
+        {
+            var activateSeasonButton = _seasonAdvanceButtonPointerCaptured
+                && seasonButtonAvailable && _showHud && SeasonAdvanceButtonBounds.Contains(mouse.X, mouse.Y);
+            _seasonAdvanceButtonPointerCaptured = false;
+            if (activateSeasonButton) AdvanceToNextSeason();
+        }
         var navigationChanged = _benchmarkDurationSeconds is null
-            && UpdateCameraNavigation(gameTime, keyboard, Mouse.GetState());
+            && UpdateCameraNavigation(gameTime, keyboard, mouse, _seasonAdvanceButtonPointerCaptured);
+        if (navigationChanged) _groundSpriteProjectionDirty = true;
         if (Pressed(keyboard, Keys.Escape)) Exit();
-        if (Pressed(keyboard, Keys.Space)) _paused = !_paused;
+        if (Pressed(keyboard, Keys.Space) && _seasonAdvanceTask is not null)
+        {
+            _seasonAdvanceCancellation?.Cancel();
+        }
+        else if (Pressed(keyboard, Keys.Space))
+        {
+            _tickAccumulator = 0;
+            _paused = !_paused;
+        }
         if (Pressed(keyboard, Keys.D1)) _overlayMode = 0;
         if (Pressed(keyboard, Keys.D2)) _overlayMode = 1;
         if (Pressed(keyboard, Keys.D3)) _overlayMode = 2;
@@ -608,8 +650,12 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         }
         if (Pressed(keyboard, Keys.OemPlus) || Pressed(keyboard, Keys.Add)) _speedIndex = Math.Min(Speeds.Length - 1, _speedIndex + 1);
         if (Pressed(keyboard, Keys.OemMinus) || Pressed(keyboard, Keys.Subtract)) _speedIndex = Math.Max(0, _speedIndex - 1);
-        if (Pressed(keyboard, Keys.F5)) SaveWorld();
-        if (Pressed(keyboard, Keys.F9)) LoadWorld();
+        if (_seasonAdvanceTask is null && Pressed(keyboard, Keys.F5)) SaveWorld();
+        if (_seasonAdvanceTask is null && Pressed(keyboard, Keys.F9))
+        {
+            _tickAccumulator = 0;
+            LoadWorld();
+        }
 
         if (_cameraNavigationDirty)
         {
@@ -617,15 +663,39 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             else _cameraNavigationIdleSeconds += Math.Clamp(gameTime.ElapsedGameTime.TotalSeconds, 0, 0.1);
             if (_cameraNavigationIdleSeconds >= 0.28)
             {
-                // Flora and rocks are frustum-culled when their meshes are built. Refresh once
-                // the user pauses navigation so panning does not rebuild millions of vertices
-                // on every input frame.
-                _groundSpritesRevision = -1;
+                // Evaluation meshes and rocks use the current view frustum. Rebuild them once
+                // navigation stops; normal sprites reproject from world anchors as the camera moves.
+                if (_visualEvaluation) _groundSpritesRevision = -1;
                 _cameraNavigationDirty = false;
             }
         }
 
-        if (!_paused)
+        if (_seasonAdvanceTask is { IsCompleted: true } completedSeasonAdvance)
+        {
+            _seasonAdvanceTask = null;
+            _seasonAdvanceCancellation?.Dispose();
+            _seasonAdvanceCancellation = null;
+            try
+            {
+                _snapshot = completedSeasonAdvance.GetAwaiter().GetResult();
+                _seasonAdvanceFailureMessage = null;
+            }
+            catch (OperationCanceledException)
+            {
+                _snapshot = _world.Snapshot();
+                _seasonAdvanceFailureMessage = null;
+            }
+            catch (Exception exception)
+            {
+                _snapshot = _world.Snapshot();
+                _seasonAdvanceFailureMessage = exception.GetBaseException().Message;
+                Console.Error.WriteLine($"Season advance failed: {_seasonAdvanceFailureMessage}");
+            }
+            _tickAccumulator = 0;
+            _paused = true;
+            RefreshTerrainTexture(force: true);
+        }
+        else if (_seasonAdvanceTask is null && !_paused)
         {
             _tickAccumulator += gameTime.ElapsedGameTime.TotalSeconds * Speeds[_speedIndex];
             var steps = Math.Min(120, (int)_tickAccumulator);
@@ -1098,6 +1168,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void DrawGroundObjects()
     {
         EnsureGroundSprites();
+        UpdateGroundSpriteProjection();
         foreach (var sprite in _groundSprites)
         {
             if (_visualEvaluation && sprite.Key.Kind is VisualKind.Grass or VisualKind.Shadow) continue;
@@ -1252,8 +1323,10 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _groundSprites.Clear();
         _floraTrees.Clear();
         _evaluationRocks.Clear();
-        void Add(VisualKey key, Vector3 ground, int x, int y, int width, int height)
-            => _groundSprites.Add(new GroundSprite(key, new Rectangle(x, y, width, height), ground.Z, _groundSprites.Count));
+        void Add(VisualKey key, Vector3 ground, Vector3 worldAnchor, int x, int y, int width, int height)
+            => _groundSprites.Add(new GroundSprite(key, worldAnchor,
+                new Rectangle(x, y, width, height), x - (int)ground.X, y - (int)ground.Y, width, height,
+                ground.Z, _groundSprites.Count));
 
         // Rebuild projected placements only when the snapshot, camera surface, or visual season changes.
         Span<TreeVisual> treeVisuals = stackalloc TreeVisual[5];
@@ -1316,6 +1389,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 else
                 {
                     Add(new(VisualKind.Rock, rockVariant, 1, VisualSeason), rockGround,
+                        new Vector3((float)rockWorldX, (float)rockElevation, (float)rockWorldZ),
                         (int)rockGround.X - rockWidth / 2, (int)rockGround.Y - rockHeight + 4,
                         rockWidth, rockHeight);
                 }
@@ -1351,6 +1425,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                         var tuftGround = ProjectGround(tuftWorldX, tuftElevation, tuftWorldZ);
                         var offsetY = (int)(tuftSeed >> 14 & 7) - 3 - (tuft == 1 ? 2 : 0);
                         Add(new(VisualKind.Grass, (int)(tuftSeed >> 8 & 15), bucket, VisualSeason), tuftGround,
+                            new Vector3((float)tuftWorldX, (float)tuftElevation, (float)tuftWorldZ),
                             (int)tuftGround.X - width / 2, (int)tuftGround.Y - height + offsetY, width, height);
                     }
                 }
@@ -1443,6 +1518,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 var shadowHeight = Math.Max(8, (int)Math.Round(shadowAnchor.Height * 0.38f));
                 if (!_visualEvaluation)
                     Add(new(VisualKind.Shadow, (int)(shadowAnchor.Seed & 7), bucket, VisualSeason), shadowCenter,
+                        new Vector3((float)shadowWorldX, (float)shadowElevation, (float)shadowWorldZ),
                         (int)shadowCenter.X - shadowAnchor.ShadowWidth / 2,
                         (int)shadowCenter.Y - shadowHeight / 2,
                         shadowAnchor.ShadowWidth, shadowHeight);
@@ -1452,7 +1528,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     var visual = treeVisuals[tree];
                     var center = new Vector3((float)visual.WorldX,
                         (float)(visual.ElevationM + visual.Height * 0.48f), (float)visual.WorldZ);
-                    if (treeFrustum.Intersects(new BoundingSphere(center, visual.Height * 0.78f)))
+                    if (!_visualEvaluation || treeFrustum.Intersects(new BoundingSphere(center, visual.Height * 0.78f)))
                     {
                         _floraTrees.Add(new ProceduralTreeInstance(
                             new Vector3((float)visual.WorldX, (float)visual.ElevationM, (float)visual.WorldZ),
@@ -1495,6 +1571,7 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                     new Vector2(ground.X, ground.Y), new Vector2(top.X, top.Y))), minimumHeight, 40);
                 var variation = ProceduralAnimalSpriteBuilder.VariationFor(_snapshot.Seed, animal.AnimalId);
                 Add(new VisualKey(VisualKind.Animal, (int)animal.FunctionalProfileId, variation, VisualSeason), ground,
+                    new Vector3((float)worldX, (float)elevation, (float)worldZ),
                     (int)Math.Round(ground.X) - width / 2, (int)Math.Round(ground.Y) - height, width, height);
                 _faunaSpriteCount++;
             }
@@ -1643,10 +1720,42 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         _groundSpritesSeed = _snapshot.Seed;
         _groundSpritesViewportWidth = viewport.Width;
         _groundSpritesViewportHeight = viewport.Height;
+        _groundSpritesProjectionZoom = _cameraZoom;
         _groundSpritesSeason = VisualSeason;
+        _groundSpriteProjectionDirty = false;
         _visualSceneBuildMs = Stopwatch.GetElapsedTime(buildStarted).TotalMilliseconds;
         RecordBenchmarkBuild(buildStarted, ref _benchmarkSpriteBuildTotalMs,
             ref _benchmarkSpriteBuildMaxMs, ref _benchmarkSpriteBuildCount);
+    }
+
+    private void UpdateGroundSpriteProjection()
+    {
+        if (!_groundSpriteProjectionDirty || _groundSprites.Count == 0) return;
+
+        var scale = _cameraZoom / Math.Max(0.0001f, _groundSpritesProjectionZoom);
+        for (var index = 0; index < _groundSprites.Count; index++)
+        {
+            var sprite = _groundSprites[index];
+            var projected = ProjectGround(sprite.WorldAnchor.X, sprite.WorldAnchor.Y, sprite.WorldAnchor.Z);
+            var width = Math.Max(1, (int)MathF.Round(sprite.BaseWidth * scale));
+            var height = Math.Max(1, (int)MathF.Round(sprite.BaseHeight * scale));
+            _groundSprites[index] = sprite with
+            {
+                Destination = new Rectangle(
+                    (int)projected.X + (int)MathF.Round(sprite.BaseOffsetX * scale),
+                    (int)projected.Y + (int)MathF.Round(sprite.BaseOffsetY * scale),
+                    width,
+                    height),
+                Depth = projected.Z
+            };
+        }
+
+        _groundSprites.Sort(static (first, second) =>
+        {
+            var depth = second.Depth.CompareTo(first.Depth);
+            return depth != 0 ? depth : first.SortOrder.CompareTo(second.SortOrder);
+        });
+        _groundSpriteProjectionDirty = false;
     }
 
     private void ExpandVisualTreeInstances(BoundingFrustum treeFrustum)
@@ -1696,7 +1805,9 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         ulong Seed, float Height, float Maturity, int ArtVariant, int ShadowWidth,
         double WorldX, double WorldZ, double ElevationM, Vector3 Ground);
 
-    private readonly record struct GroundSprite(VisualKey Key, Rectangle Destination, float Depth, int SortOrder);
+    private readonly record struct GroundSprite(
+        VisualKey Key, Vector3 WorldAnchor, Rectangle Destination, int BaseOffsetX, int BaseOffsetY,
+        int BaseWidth, int BaseHeight, float Depth, int SortOrder);
 
     private double VisualAnchorElevation(double eastCell, double northCell)
     {
@@ -1721,15 +1832,22 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             cardX + 20, cardY + 13, new Color(231, 226, 201), 2);
         DrawText($"DAY {_snapshot.DayOfYear:D3} {SeasonName(_snapshot.Season)}  {mode}",
             cardX + 21, cardY + 42, new Color(149, 203, 190), 1);
+        var runStatus = _seasonAdvanceTask is not null
+            ? _seasonAdvanceCancellation?.IsCancellationRequested == true ? "CANCELLING" : "FAST FORWARD"
+            : _paused ? "PAUSED" : $"RUN {Speeds[_speedIndex]} TICKS/S";
         var controls = _visualEvaluation
             ? $"C CAMERA {ProjectionName}  SNAPSHOT {(_paused ? "PAUSED" : "RUNNING")}  W {(_showWaterFixtures ? "HIDE" : "SHOW")} FIXTURES  SPACE SIM"
-            : $"{(_paused ? "PAUSED" : $"RUN {Speeds[_speedIndex]} TICKS/S")}  1 LAND  2 WATER  3 BIOMASS  SPACE PAUSE  H HIDE";
+            : _seasonAdvanceTask is not null
+                ? $"{runStatus} TO NEXT SEASON  1 LAND  2 WATER  3 BIOMASS  SPACE CANCEL"
+                : $"{runStatus}  1 LAND  2 WATER  3 BIOMASS  SPACE PAUSE  H HIDE";
         DrawText(controls,
             cardX + 21, cardY + 61, new Color(207, 216, 207), 1);
         DrawText($"WHEEL / PGUP-DN ZOOM {Math.Round(_cameraZoom * 100):F0} PCT  L/M/R DRAG PAN  ARROWS PAN  HOME RESET",
             cardX + 21, cardY + 79, new Color(207, 216, 207), 1);
 
         var mouse = Mouse.GetState();
+        if (!_visualEvaluation && _capturePath is null && _benchmarkDurationSeconds is null)
+            DrawSeasonAdvanceButton(mouse);
         if (_capturePath is null && !IsCameraPanButtonDown(mouse)
             && TryGetCellAtScreen(mouse.X, mouse.Y, out var cell))
         {
@@ -1747,6 +1865,32 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         var predators = _snapshot.Animals.Count(animal => animal.FunctionalProfileId == AnimalFunctionalProfileV1.Predator);
         DrawText($"SEED {_snapshot.Seed}   FPS {_fps:F0}   HERB {herbivores}   PRED {predators}", 26, viewport.Height - 24,
             new Color(220, 225, 210, 210), 1);
+    }
+
+    private void DrawSeasonAdvanceButton(MouseState mouse)
+    {
+        var bounds = SeasonAdvanceButtonBounds;
+        var advancing = _seasonAdvanceTask is not null;
+        var failed = _seasonAdvanceFailureMessage is not null;
+        var hovered = bounds.Contains(mouse.X, mouse.Y);
+        var fill = advancing
+            ? new Color(65, 76, 45, 245)
+            : failed ? new Color(77, 50, 40, 240)
+            : hovered ? new Color(67, 83, 51, 245) : new Color(39, 54, 39, 230);
+        var border = advancing ? new Color(202, 208, 139)
+            : failed ? new Color(211, 140, 111) : new Color(139, 164, 111);
+        _batch.Draw(_pixel, bounds, fill);
+        _batch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), border);
+        _batch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), border);
+        _batch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), border);
+        _batch.Draw(_pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), border);
+
+        var label = advancing
+            ? _seasonAdvanceCancellation?.IsCancellationRequested == true ? "CANCELLING..." : "ADVANCING..."
+            : failed ? "RETRY SEASON" : "NEXT SEASON";
+        var labelWidth = label.Length * 4;
+        DrawText(label, bounds.X + (bounds.Width - labelWidth) / 2, bounds.Y + 8,
+            new Color(235, 231, 196), 1);
     }
 
     private void DrawLegend(int x, int y, Color color, string text)
@@ -2500,9 +2644,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 var radius = ring / (double)radialRings;
                 var gridX = feature.CenterEastCell + (rim.EastCell - feature.CenterEastCell) * radius;
                 var gridY = feature.CenterNorthCell + (rim.NorthCell - feature.CenterNorthCell) * radius;
-                var elevation = ring == radialRings
-                    ? DisplayElevation(rim.CrownElevationM)
-                    : _terrainHeightSampler(gridX, gridY);
+                // Keep the rim on the same presented surface as the interior.
+                var sampleRadius = ring == radialRings ? radius * 0.999999 : radius;
+                var elevation = _terrainHeightSampler(
+                    feature.CenterEastCell + (rim.EastCell - feature.CenterEastCell) * sampleRadius,
+                    feature.CenterNorthCell + (rim.NorthCell - feature.CenterNorthCell) * sampleRadius);
                 var position = new Vector3((float)(gridX * Tile), (float)elevation, (float)(gridY * Tile));
                 const double normalStep = 0.08;
                 var eastSlope = (_terrainHeightSampler(gridX + normalStep, gridY)
@@ -2568,8 +2714,11 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
 
             Vector3 WallPoint(TerrainRimPoint point, float depthFraction)
             {
-                var crownElevation = (float)DisplayElevation(point.CrownElevationM);
-                var baseElevation = (float)DisplayElevation(point.ToeElevationM - 1.0);
+                // Apply the island and biome transforms to walls as well as terrain.
+                var crownElevation = (float)_terrainHeightSampler(
+                    feature.CenterEastCell + (point.EastCell - feature.CenterEastCell) * 0.999999,
+                    feature.CenterNorthCell + (point.NorthCell - feature.CenterNorthCell) * 0.999999);
+                var baseElevation = (float)_underlyingHeightSampler(point.EastCell, point.NorthCell) - 1f;
                 var angle = Math.Atan2(point.NorthCell - feature.CenterNorthCell,
                     point.EastCell - feature.CenterEastCell);
                 var taper = Math.Sin(depthFraction * Math.PI);
@@ -4031,7 +4180,43 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
             horizontal * MathF.Cos(azimuth));
     }
 
-    private bool UpdateCameraNavigation(GameTime gameTime, KeyboardState keyboard, MouseState mouse)
+    private void AdvanceToNextSeason()
+    {
+        if (_visualEvaluation || _capturePath is not null || _benchmarkDurationSeconds is not null
+            || _seasonAdvanceTask is not null)
+            return;
+
+        var startTick = _snapshot.TickIndex;
+        var targetTick = Calendar.NextSeasonStartTick(startTick);
+        var remainingTicks = checked((int)(targetTick - startTick));
+        _seasonAdvanceFailureMessage = null;
+        _seasonAdvanceCancellation = new CancellationTokenSource();
+        var cancellationToken = _seasonAdvanceCancellation.Token;
+        _seasonAdvanceTask = Task.Run(() =>
+        {
+            var ticksRemaining = remainingTicks;
+            var currentTick = startTick;
+            while (ticksRemaining > 0 && !cancellationToken.IsCancellationRequested)
+            {
+                var ticksUntilDayBoundary = (int)(SimulationState.TicksPerDay
+                    - currentTick % SimulationState.TicksPerDay);
+                var steps = Math.Min(ticksRemaining, ticksUntilDayBoundary);
+                _world.AdvanceTicks(steps);
+                currentTick += steps;
+                ticksRemaining -= steps;
+            }
+
+            return _world.Snapshot();
+        }, cancellationToken);
+        _tickAccumulator = 0;
+        _paused = false;
+    }
+
+    private bool UpdateCameraNavigation(
+        GameTime gameTime,
+        KeyboardState keyboard,
+        MouseState mouse,
+        bool suppressLeftButtonPan)
     {
         if (!_hasPreviousMouse)
         {
@@ -4065,7 +4250,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
                 changed = true;
         }
 
-        if (IsCameraPanButtonDown(mouse) && IsCameraPanButtonDown(oldMouse))
+        if (IsCameraPanButtonDown(mouse, !suppressLeftButtonPan)
+            && IsCameraPanButtonDown(oldMouse, !suppressLeftButtonPan))
         {
             var viewport = GraphicsDevice.Viewport;
             var previousX = Math.Clamp(oldMouse.X, 0, viewport.Width - 1);
@@ -4124,8 +4310,8 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
         return true;
     }
 
-    private static bool IsCameraPanButtonDown(MouseState state)
-        => state.LeftButton == ButtonState.Pressed
+    private static bool IsCameraPanButtonDown(MouseState state, bool includeLeftButton = true)
+        => includeLeftButton && state.LeftButton == ButtonState.Pressed
             || state.MiddleButton == ButtonState.Pressed
             || state.RightButton == ButtonState.Pressed;
 
@@ -4238,9 +4424,12 @@ internal sealed class NaturalWorldGame : Microsoft.Xna.Framework.Game
     private void LoadWorld()
     {
         if (!File.Exists(_savePath)) return;
-        _world = WorldSimulation.Load(File.ReadAllText(_savePath), _cosmos, _atmosphere, _atmosphere,
+        var loadedWorld = WorldSimulation.Load(File.ReadAllText(_savePath), _cosmos, _atmosphere, _atmosphere,
             _geosphere, _geosphere, _geosphere, _hydrosphere, _biosphere, _biosphere, _biosphere);
-        _snapshot = _world.Snapshot();
+        var loadedSnapshot = loadedWorld.Snapshot();
+        TerrainSnapshotCompatibility.Validate(loadedSnapshot);
+        _world = loadedWorld;
+        _snapshot = loadedSnapshot;
         RefreshHydrologyPresentationFields();
         _groundSpritesRevision = -1;
         _tickAccumulator = 0;
