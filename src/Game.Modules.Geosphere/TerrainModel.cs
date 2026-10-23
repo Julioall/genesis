@@ -140,9 +140,11 @@ public static class TerrainModel
 
     private sealed class TerrainGenerator
     {
-        private const double MinimumPlateauReliefM = 18;
-        private const double MaximumPlateauWallM = 40;
+        // Leave a representable margin above the public 18 m wall-floor after rim sampling.
+        private const double MinimumPlateauReliefM = 18.000001;
+        private const double MaximumPlateauWallM = 39.999999;
         private const double RidgeWidthMultiplier = 1.45;
+        private const double RidgeAmplitudeMultiplier = 0.80;
         private readonly ValueNoise _broad;
         private readonly ValueNoise _regional;
         private readonly ValueNoise _detail;
@@ -182,14 +184,14 @@ public static class TerrainModel
                     (12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 49, 1, 0, 0) * 4) * _scaleX,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 50, 1, 0, 0) * 0.24,
                     (4.6 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 51, 1, 0, 0) * 1.0) * _scaleX * RidgeWidthMultiplier,
-                    170 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 20,
+                    (170 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 52, 1, 0, 0) * 20) * RidgeAmplitudeMultiplier,
                     westPhase),
                 new MountainRange(
                     1,
                     (48 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 53, 1, 0, 0) * 4) * _scaleX,
                     -0.12 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 54, 1, 0, 0) * 0.24,
                     (4.0 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 55, 1, 0, 0) * 0.9) * _scaleX * RidgeWidthMultiplier,
-                    132 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 18,
+                    (132 + CounterRandom.Unit(seed, CounterRandom.TerrainTag, 56, 1, 0, 0) * 18) * RidgeAmplitudeMultiplier,
                     eastPhase)
             ];
             _ridgeSpurs = CreateRidgeSpurs(seed);

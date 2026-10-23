@@ -16,6 +16,14 @@ public static class CreatureTerrainRoutePlannerV1
         (0, -1), (-1, 0), (1, 0), (0, 1),
         (-1, -1), (1, -1), (-1, 1), (1, 1)
     ];
+    [ThreadStatic] private static RoutePlanningWorkspace? _workspace;
+
+    private sealed class RoutePlanningWorkspace
+    {
+        public readonly double[] Costs = new double[SimulationState.Width * SimulationState.Height];
+        public readonly int[] Previous = new int[SimulationState.Width * SimulationState.Height];
+        public readonly PriorityQueue<int, (double Score, double Cost, int Index)> Frontier = new();
+    }
 
     public static IReadOnlyList<CreatureMovementRouteSampleV1>? PlanTerrestrialRoute(
         IReadOnlyList<CreatureMovementRouteSampleV1> environmentalGrid,
@@ -28,7 +36,22 @@ public static class CreatureTerrainRoutePlannerV1
         double maximumWadeDepthM,
         double maximumSampleSpacingM)
         => PlanGridRoute(environmentalGrid, columns, rows, cellSpacingM, start, goal,
-            RouteMode.Terrestrial, maximumSlopeGrade, maximumWadeDepthM, maximumSampleSpacingM);
+            RouteMode.Terrestrial, maximumSlopeGrade, maximumWadeDepthM, maximumSampleSpacingM, true);
+
+    // Zoology constructs this complete grid from its owner-controlled cache immediately before
+    // a detour request. Rechecking every cell for each animal would add no validation coverage.
+    internal static IReadOnlyList<CreatureMovementRouteSampleV1>? PlanTerrestrialRouteFromValidatedGrid(
+        IReadOnlyList<CreatureMovementRouteSampleV1> environmentalGrid,
+        int columns,
+        int rows,
+        double cellSpacingM,
+        CreatureMovementRouteSampleV1 start,
+        CreatureMovementRouteSampleV1 goal,
+        double maximumSlopeGrade,
+        double maximumWadeDepthM,
+        double maximumSampleSpacingM)
+        => PlanGridRoute(environmentalGrid, columns, rows, cellSpacingM, start, goal,
+            RouteMode.Terrestrial, maximumSlopeGrade, maximumWadeDepthM, maximumSampleSpacingM, false);
 
     /// <summary>
     /// Plans a freshwater route through cells with enough caller-sampled water depth.
@@ -44,7 +67,7 @@ public static class CreatureTerrainRoutePlannerV1
         double minimumSwimDepthM,
         double maximumSampleSpacingM)
         => PlanGridRoute(environmentalGrid, columns, rows, cellSpacingM, start, goal,
-            RouteMode.Freshwater, minimumSwimDepthM, 0, maximumSampleSpacingM);
+            RouteMode.Freshwater, minimumSwimDepthM, 0, maximumSampleSpacingM, true);
 
     private static IReadOnlyList<CreatureMovementRouteSampleV1>? PlanGridRoute(
         IReadOnlyList<CreatureMovementRouteSampleV1> environmentalGrid,
@@ -56,10 +79,11 @@ public static class CreatureTerrainRoutePlannerV1
         RouteMode mode,
         double routeLimit,
         double secondaryLimit,
-        double maximumSampleSpacingM)
+        double maximumSampleSpacingM,
+        bool validateGrid)
     {
         ArgumentNullException.ThrowIfNull(environmentalGrid);
-        ValidateGrid(environmentalGrid, columns, rows, cellSpacingM);
+        if (validateGrid) ValidateGrid(environmentalGrid, columns, rows, cellSpacingM);
         ValidateSample(start, nameof(start));
         ValidateSample(goal, nameof(goal));
         if (!double.IsFinite(routeLimit) || routeLimit < 0
@@ -113,9 +137,15 @@ public static class CreatureTerrainRoutePlannerV1
         if (startIndex == goalIndex) return [startIndex];
 
         var count = checked(columns * rows);
-        var costs = Enumerable.Repeat(double.PositiveInfinity, count).ToArray();
-        var previous = Enumerable.Repeat(-1, count).ToArray();
-        var frontier = new PriorityQueue<int, (double Score, double Cost, int Index)>();
+        var workspace = _workspace ??= new RoutePlanningWorkspace();
+        if (workspace.Costs.Length < count)
+            throw new InvalidOperationException("Route planning workspace is smaller than the requested grid.");
+        var costs = workspace.Costs;
+        var previous = workspace.Previous;
+        Array.Fill(costs, double.PositiveInfinity, 0, count);
+        Array.Fill(previous, -1, 0, count);
+        var frontier = workspace.Frontier;
+        frontier.Clear();
         costs[startIndex] = 0;
         frontier.Enqueue(startIndex, (Heuristic(grid[startIndex], grid[goalIndex]), 0, startIndex));
 

@@ -10,11 +10,73 @@ using Game.Modules.Geosphere;
 using Game.Modules.Hydrosphere;
 using Game.Procedural;
 using Microsoft.Xna.Framework;
+using Xunit.Abstractions;
 
 namespace Game.Tests;
 
 public sealed class L0WorldTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public L0WorldTests(ITestOutputHelper output) => _output = output;
+
+    [Theory]
+    [InlineData(1UL, 2790, 2416)]
+    [InlineData(2UL, 2540, 2244)]
+    [InlineData(3UL, 2739, 2340)]
+    public void Relief_habitat_counts_are_measured_against_baseline(ulong seed, int baselineVegetation, int baselineLand)
+    {
+        var snapshot = TestWorldFactory.Create(seed).Snapshot();
+        var elevations = TerrainModel.GenerateElevationField(seed);
+        var vegetation = 0;
+        var land = new bool[snapshot.Cells.Count];
+        for (var i = 0; i < snapshot.Cells.Count; i++)
+        {
+            var cell = snapshot.Cells[i];
+            var slope = TerrainModel.SlopeMagnitude(elevations, cell.X, cell.Y);
+            if (cell.SurfaceWaterMm <= 150 && slope <= 1.0) vegetation++;
+            land[i] = cell.SurfaceWaterMm <= 150 && slope <= 0.75;
+        }
+
+        var visited = new bool[land.Length];
+        var largest = 0;
+        for (var start = 0; start < land.Length; start++)
+        {
+            if (!land[start] || visited[start]) continue;
+            var queue = new Queue<int>();
+            queue.Enqueue(start);
+            visited[start] = true;
+            var size = 0;
+            while (queue.TryDequeue(out var index))
+            {
+                size++;
+                var x = index % SimulationState.Width;
+                var y = index / SimulationState.Width;
+                for (var dy = -1; dy <= 1; dy++)
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    var nx = x + dx;
+                    var ny = y + dy;
+                    if (nx < 0 || nx >= SimulationState.Width || ny < 0 || ny >= SimulationState.Height) continue;
+                    var neighbor = ny * SimulationState.Width + nx;
+                    if (visited[neighbor] || !land[neighbor]) continue;
+                    visited[neighbor] = true;
+                    queue.Enqueue(neighbor);
+                }
+            }
+            largest = Math.Max(largest, size);
+        }
+
+        var conservativeLand = land.Count(value => value);
+        Assert.True(vegetation >= baselineVegetation,
+            $"Seed {seed} vegetation-eligible cells {vegetation} fell below baseline {baselineVegetation}.");
+        Assert.True(conservativeLand >= baselineLand,
+            $"Seed {seed} conservative terrestrial habitat {conservativeLand} fell below baseline {baselineLand}.");
+        Assert.True(largest >= conservativeLand * 0.90,
+            $"Seed {seed} largest connected terrestrial component {largest} is less than 90% of eligible habitat {conservativeLand}.");
+        _output.WriteLine($"seed={seed} vegetation={vegetation} conservative-land={conservativeLand} largest-d8={largest}");
+    }
+
     [Fact]
     public void Counter_random_matches_the_documented_L0_vector()
     {
@@ -49,7 +111,7 @@ public sealed class L0WorldTests
         Assert.Equal(first, repeat);
         Assert.NotEqual(first, otherSeed);
         Assert.True(first.Max() - first.Min() > 45);
-        Assert.True(first.Max() > 220, $"Expected a high mountain crest in the raised v16 terrain, got {first.Max():F1} m.");
+        Assert.True(first.Max() > 190, $"Expected a distinct high mountain crest after reducing ridge amplitude, got {first.Max():F1} m.");
 
         var rowsWithMountainCrests = Enumerable.Range(0, SimulationState.Height)
             .Count(y => Enumerable.Range(0, SimulationState.Width)
@@ -131,6 +193,7 @@ public sealed class L0WorldTests
 
         commonDrops.Sort();
         var p95 = commonDrops[(int)Math.Ceiling(commonDrops.Count * 0.95) - 1];
+        _output.WriteLine($"seed={seed} common-p95={p95:F2} common-max={commonDrops[^1]:F2}");
         var baselineP95 = seed switch { 1 => 16.44, 2 => 18.37, _ => 16.84 };
         var baselineMaximum = seed switch { 1 => 39.96, 2 => 41.18, _ => 38.82 };
         Assert.True(p95 <= baselineP95 * 0.90, $"Seed {seed} common P95 {p95:F2} m did not improve by 10% from {baselineP95:F2} m.");

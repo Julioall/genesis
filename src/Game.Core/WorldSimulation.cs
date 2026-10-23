@@ -183,7 +183,7 @@ public sealed class WorldSimulation
         {
             var zoology = _zoology.AdvanceTick(new ZoologyTickInputV1(
                 _state.Seed, _state.TickIndex, _zoologyCells,
-                (AnimalAgentV1[])_state.Animals.Clone(), _state.NextAnimalId));
+                _state.Animals, _state.NextAnimalId));
             if (zoology.CellChanges is null || zoology.CellChanges.Length > _state.Cells.Length || zoology.Animals is null
                 || zoology.WaterDeposits is null
                 || !double.IsFinite(zoology.AnimalRespirationDryGrams) || zoology.AnimalRespirationDryGrams < 0

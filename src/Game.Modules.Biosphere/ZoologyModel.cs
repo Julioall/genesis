@@ -15,6 +15,8 @@ public static class ZoologyModel
     private const double RouteSampleSpacingM = 5;
     private const ulong GeneticMutationTag = 0x5A354D5554415445UL;
     private static readonly CreatureDevelopmentModelV1 CreatureDevelopment = new();
+    private static readonly CreatureMovementSolverV1 DefaultMovementSolver = new();
+    private static readonly CreatureEnergyBudgetModelV1 DefaultEnergyBudget = new();
 
     private readonly record struct Profile(
         double InitialStructuralDryG,
@@ -65,8 +67,25 @@ public static class ZoologyModel
     public static AnimalAgentV1[] EnsureGenomes(ulong seed, AnimalAgentV1[] animals)
     {
         ArgumentNullException.ThrowIfNull(animals);
+        var firstMissingGenome = -1;
+        for (var index = 0; index < animals.Length; index++)
+        {
+            var animal = animals[index];
+            var species = SpeciesFor(animal.FunctionalProfileId);
+            if (animal.Genome is { } genome)
+            {
+                _ = CreatureDevelopmentModelV1.ExportGenome(species, genome);
+                continue;
+            }
+
+            firstMissingGenome = index;
+            break;
+        }
+
+        if (firstMissingGenome < 0) return animals;
+
         var result = (AnimalAgentV1[])animals.Clone();
-        for (var index = 0; index < result.Length; index++)
+        for (var index = firstMissingGenome; index < result.Length; index++)
         {
             var animal = result[index];
             var species = SpeciesFor(animal.FunctionalProfileId);
@@ -91,8 +110,8 @@ public static class ZoologyModel
         ICreatureEnergyBudgetV1? energyBudget = null)
     {
         ArgumentNullException.ThrowIfNull(botany);
-        movementSolver ??= new CreatureMovementSolverV1();
-        energyBudget ??= new CreatureEnergyBudgetModelV1();
+        movementSolver ??= DefaultMovementSolver;
+        energyBudget ??= DefaultEnergyBudget;
         ArgumentNullException.ThrowIfNull(input.Cells);
         ArgumentNullException.ThrowIfNull(input.Animals);
         if (input.Cells.Length != SimulationState.Width * SimulationState.Height || input.TickIndex <= 0)
@@ -566,6 +585,45 @@ public static class ZoologyModel
         var distance = Distance(animal.PositionXM, animal.PositionYM, target.X, target.Y);
         if (distance <= 1e-10) return null;
         var sampleCount = Math.Max(1, (int)Math.Ceiling(distance / RouteSampleSpacingM));
+
+        if (movementSolver is CreatureMovementSolverV1)
+        {
+            var fastDirectResult = ResolveDefaultDirectRoute(cells, animal, target, sampleCount,
+                maximumTravelDistanceM, out var start, out var goal);
+            if (fastDirectResult.TargetReached
+                || fastDirectResult.StopReason is not (CreatureMovementStopReasonV1.SlopeLimit
+                    or CreatureMovementStopReasonV1.HabitatBoundary))
+                return fastDirectResult;
+
+            routeEnvironmentGrid ??= cells.Select(cell => new CreatureMovementRouteSampleV1(
+                    (cell.X + 0.5) * CellSizeM,
+                    (cell.Y + 0.5) * CellSizeM,
+                    cell.GroundElevationM,
+                    cell.SurfaceWaterMm / 1000))
+                .ToArray();
+            var fastAlternativeRoute = CreatureTerrainRoutePlannerV1.PlanTerrestrialRouteFromValidatedGrid(
+                routeEnvironmentGrid,
+                SimulationState.Width,
+                SimulationState.Height,
+                CellSizeM,
+                start,
+                goal,
+                PrototypeMaximumSlopeGrade,
+                PrototypeMaximumWadeDepthM,
+                RouteSampleSpacingM);
+            if (fastAlternativeRoute is null) return fastDirectResult;
+
+            return movementSolver.ResolveMovement(new CreatureMovementRequestV1(
+                CreatureFamilyV1.Quadruped,
+                CreatureMovementHabitatV1.Terrestrial,
+                fastAlternativeRoute,
+                maximumTravelDistanceM,
+                PrototypeMaximumSlopeGrade,
+                PrototypeMaximumWadeDepthM,
+                0,
+                RouteSampleSpacingM));
+        }
+
         var route = new CreatureMovementRouteSampleV1[sampleCount + 1];
         for (var sampleIndex = 0; sampleIndex <= sampleCount; sampleIndex++)
         {
@@ -598,7 +656,7 @@ public static class ZoologyModel
                 cell.GroundElevationM,
                 cell.SurfaceWaterMm / 1000))
             .ToArray();
-        var alternativeRoute = CreatureTerrainRoutePlannerV1.PlanTerrestrialRoute(
+        var alternativeRoute = CreatureTerrainRoutePlannerV1.PlanTerrestrialRouteFromValidatedGrid(
             routeEnvironmentGrid,
             SimulationState.Width,
             SimulationState.Height,
@@ -612,6 +670,90 @@ public static class ZoologyModel
 
         return movementSolver.ResolveMovement(movementRequest with { RouteSamples = alternativeRoute });
     }
+
+    private static CreatureMovementResultV1 ResolveDefaultDirectRoute(
+        ZoologyCellStateV1[] cells,
+        AnimalAgentV1 animal,
+        (double X, double Y) target,
+        int sampleCount,
+        double maximumTravelDistanceM,
+        out CreatureMovementRouteSampleV1 start,
+        out CreatureMovementRouteSampleV1 goal)
+    {
+        start = SampleRoutePoint(cells, animal, target, 0, sampleCount);
+        goal = SampleRoutePoint(cells, animal, target, sampleCount, sampleCount);
+        if (start.SurfaceWaterDepthM > PrototypeMaximumWadeDepthM + 1e-10)
+            return CreateMovementResult(start, 0, 1, false, CreatureMovementStopReasonV1.HabitatBoundary);
+
+        var previous = start;
+        var traveled = 0.0;
+        for (var sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex++)
+        {
+            var current = sampleIndex == sampleCount
+                ? goal
+                : SampleRoutePoint(cells, animal, target, sampleIndex, sampleCount);
+            var dx = current.XPositionM - previous.XPositionM;
+            var dz = current.ZPositionM - previous.ZPositionM;
+            var segmentLength = Math.Sqrt(dx * dx + dz * dz);
+            var grade = Math.Abs(current.GroundElevationM - previous.GroundElevationM) / segmentLength;
+            if (grade > PrototypeMaximumSlopeGrade + 1e-10)
+                return CreateMovementResult(previous, traveled, sampleIndex, false, CreatureMovementStopReasonV1.SlopeLimit);
+
+            if (current.SurfaceWaterDepthM > PrototypeMaximumWadeDepthM + 1e-10)
+            {
+                var deltaDepth = current.SurfaceWaterDepthM - previous.SurfaceWaterDepthM;
+                var boundaryFraction = deltaDepth <= 0 ? 1
+                    : Math.Clamp((PrototypeMaximumWadeDepthM - previous.SurfaceWaterDepthM) / deltaDepth, 0, 1);
+                var boundaryDistance = segmentLength * boundaryFraction;
+                var remainingDistance = maximumTravelDistanceM - traveled;
+                if (boundaryDistance > remainingDistance + 1e-10)
+                    return CreateMovementResult(InterpolateRoute(previous, current,
+                            Math.Clamp(remainingDistance / segmentLength, 0, 1)),
+                        maximumTravelDistanceM, sampleIndex, false, CreatureMovementStopReasonV1.DistanceLimit);
+                return CreateMovementResult(InterpolateRoute(previous, current, boundaryFraction),
+                    traveled + boundaryDistance, sampleIndex, false, CreatureMovementStopReasonV1.HabitatBoundary);
+            }
+
+            var remaining = maximumTravelDistanceM - traveled;
+            if (segmentLength > remaining + 1e-10)
+                return CreateMovementResult(InterpolateRoute(previous, current,
+                        Math.Clamp(remaining / segmentLength, 0, 1)),
+                    maximumTravelDistanceM, sampleIndex, false, CreatureMovementStopReasonV1.DistanceLimit);
+            traveled += segmentLength;
+            previous = current;
+        }
+
+        return CreateMovementResult(goal, traveled, sampleCount + 1, true, CreatureMovementStopReasonV1.TargetReached);
+    }
+
+    private static CreatureMovementRouteSampleV1 SampleRoutePoint(
+        ZoologyCellStateV1[] cells, AnimalAgentV1 animal, (double X, double Y) target,
+        int sampleIndex, int sampleCount)
+    {
+        var fraction = (double)sampleIndex / sampleCount;
+        var x = animal.PositionXM + (target.X - animal.PositionXM) * fraction;
+        var z = animal.PositionYM + (target.Y - animal.PositionYM) * fraction;
+        return new(x, z,
+            SampleObservation(cells, x, z, cell => cell.GroundElevationM),
+            SampleObservation(cells, x, z, cell => cell.SurfaceWaterMm) / 1000);
+    }
+
+    private static CreatureMovementRouteSampleV1 InterpolateRoute(
+        CreatureMovementRouteSampleV1 first, CreatureMovementRouteSampleV1 second, double fraction)
+        => new(
+            first.XPositionM + (second.XPositionM - first.XPositionM) * fraction,
+            first.ZPositionM + (second.ZPositionM - first.ZPositionM) * fraction,
+            first.GroundElevationM + (second.GroundElevationM - first.GroundElevationM) * fraction,
+            first.SurfaceWaterDepthM + (second.SurfaceWaterDepthM - first.SurfaceWaterDepthM) * fraction);
+
+    private static CreatureMovementResultV1 CreateMovementResult(
+        CreatureMovementRouteSampleV1 sample,
+        double distance,
+        int acceptedSamples,
+        bool targetReached,
+        CreatureMovementStopReasonV1 reason)
+        => new(new(sample.XPositionM, sample.GroundElevationM, sample.ZPositionM), distance,
+            acceptedSamples, targetReached, reason);
 
     private static double SampleObservation(
         ZoologyCellStateV1[] cells,

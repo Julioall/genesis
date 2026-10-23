@@ -138,4 +138,21 @@ public static class Calendar
         >= 264 and < 355 => Season.Autumn,
         _ => Season.Winter
     };
+
+    public static long NextSeasonStartTick(long tickIndex)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(tickIndex);
+
+        var currentDayNumber = tickIndex / SimulationState.TicksPerDay;
+        var currentSeason = SeasonForDay((int)(currentDayNumber % 365) + 1);
+        for (var dayOffset = 1; dayOffset <= 365; dayOffset++)
+        {
+            var targetDayNumber = currentDayNumber + dayOffset;
+            var targetDayOfYear = (int)(targetDayNumber % 365) + 1;
+            if (SeasonForDay(targetDayOfYear) == currentSeason) continue;
+            return checked(targetDayNumber * SimulationState.TicksPerDay);
+        }
+
+        throw new InvalidOperationException("No season boundary found in the calendar year.");
+    }
 }
